@@ -14,6 +14,7 @@ create table if not exists app_state (
   body_metrics jsonb not null default '[]'::jsonb,
   water jsonb not null default '{}'::jsonb,
   contact_email text,
+  custom_recipes jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
 
@@ -23,6 +24,7 @@ alter table app_state add column if not exists custom_foods jsonb not null defau
 alter table app_state add column if not exists body_metrics jsonb not null default '[]'::jsonb;
 alter table app_state add column if not exists water jsonb not null default '{}'::jsonb;
 alter table app_state add column if not exists contact_email text;
+alter table app_state add column if not exists custom_recipes jsonb not null default '[]'::jsonb;
 
 alter table app_state enable row level security;
 

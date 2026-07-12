@@ -23,14 +23,26 @@ export const GOALS = {
   gain: { label: 'Build muscle', calorieAdjust: 0.12, proteinPerKg: 1.8 },
 }
 
+// Eating-style preference shifts the fat/carb split (protein stays governed
+// by the goal above, since that's driven by bodyweight and training goal,
+// not eating style). Low-carb tilts toward fat; high-protein pushes protein
+// up further and trims fat slightly to make room; balanced is the default.
+export const EATING_STYLES = {
+  balanced: { label: 'Balanced / Mediterranean', fatPct: 0.28, proteinBonusPerKg: 0 },
+  lowcarb: { label: 'Low-carb / plant-forward low-carb', fatPct: 0.40, proteinBonusPerKg: 0 },
+  highprotein: { label: 'High-protein / muscle building focus', fatPct: 0.25, proteinBonusPerKg: 0.3 },
+  none: { label: 'No preference — design what fits my goals', fatPct: 0.28, proteinBonusPerKg: 0 },
+}
+
 // Splits a calorie total into protein/carbs/fat grams. Protein is set by
-// bodyweight (higher for a cut to protect muscle), fat held near 28% of total,
-// carbs fill whatever's left. Shared by the flat-percentage goal calculator
-// and the timed goal-plan calculator so both produce consistent macro splits.
-function macroSplitForCalories(calories, weightKg, proteinPerKg) {
+// bodyweight (higher for a cut to protect muscle, plus an eating-style
+// bonus), fat set by eating style, carbs fill whatever's left. Shared by the
+// flat-percentage goal calculator and the timed goal-plan calculator so both
+// produce consistent macro splits.
+function macroSplitForCalories(calories, weightKg, proteinPerKg, fatPct = 0.28) {
   const protein = Math.round(proteinPerKg * weightKg)
   const proteinCals = protein * 4
-  const fatCals = calories * 0.28
+  const fatCals = calories * fatPct
   const fat = Math.round(fatCals / 9)
   const remainingCals = Math.max(calories - proteinCals - fatCals, 0)
   const carbs = Math.round(remainingCals / 4)
@@ -38,12 +50,13 @@ function macroSplitForCalories(calories, weightKg, proteinPerKg) {
 }
 
 // Returns { calories, protein, carbs, fat } in grams (calories in kcal)
-export function calculateTargets({ sex, weightKg, heightCm, age, activityKey, goalKey }) {
+export function calculateTargets({ sex, weightKg, heightCm, age, activityKey, goalKey, eatingStyle = 'balanced' }) {
   const bmr = calculateBMR({ sex, weightKg, heightCm, age })
   const tdee = calculateTDEE(bmr, activityKey)
   const goal = GOALS[goalKey]
+  const style = EATING_STYLES[eatingStyle] || EATING_STYLES.balanced
   const calories = Math.round(tdee * (1 + goal.calorieAdjust))
-  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, goal.proteinPerKg)
+  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, goal.proteinPerKg + style.proteinBonusPerKg, style.fatPct)
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), calories, protein, carbs, fat }
 }
 

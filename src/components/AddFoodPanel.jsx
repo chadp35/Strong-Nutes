@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { searchBrandedFoods, macrosForGrams } from '../lib/openFoodFacts.js'
+import React, { Suspense, useEffect, useRef, useState, lazy } from 'react'
+import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
+
+const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'))
 
 const SUBTABS = [
   { key: 'search', label: 'Search' },
@@ -7,7 +9,7 @@ const SUBTABS = [
   { key: 'manual', label: 'Manual' },
 ]
 
-export default function AddFoodPanel({ customFoods, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone }) {
+export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone }) {
   const [subtab, setSubtab] = useState('search')
 
   return (
@@ -35,7 +37,7 @@ export default function AddFoodPanel({ customFoods, onAddEntry, onSaveCustomFood
         <BrandedSearch onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
       )}
       {subtab === 'mine' && (
-        <MyFoods customFoods={customFoods} onAddEntry={onAddEntry} onDeleteCustomFood={onDeleteCustomFood} onDone={onDone} />
+        <MyFoods customFoods={customFoods} customRecipes={customRecipes} onAddEntry={onAddEntry} onDeleteCustomFood={onDeleteCustomFood} onDone={onDone} />
       )}
       {subtab === 'manual' && (
         <ManualEntry onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
@@ -53,6 +55,7 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [grams, setGrams] = useState(100)
+  const [scanning, setScanning] = useState(false)
   const debounceRef = useRef(null)
 
   useEffect(() => {
@@ -79,6 +82,20 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
   function selectFood(food) {
     setSelected(food)
     setGrams(food.servingGrams || 100)
+  }
+
+  async function handleBarcodeDetected(code) {
+    setScanning(false)
+    setLoading(true)
+    setError('')
+    try {
+      const food = await getProductByBarcode(code)
+      selectFood(food)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   function logSelected(alsoSave) {
@@ -121,17 +138,29 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
     )
   }
 
+  if (scanning) {
+    return (
+      <Suspense fallback={<p className="muted small">Loading scanner…</p>}>
+        <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
+      </Suspense>
+    )
+  }
+
   return (
     <div>
       <div className="field">
         <label>Search branded foods</label>
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="e.g. brown sugar cinnamon pop-tarts"
-        />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="e.g. brown sugar cinnamon pop-tarts"
+            style={{ flex: 1 }}
+          />
+          <button className="secondary" onClick={() => setScanning(true)}>📷 Scan</button>
+        </div>
       </div>
-      {loading && <p className="muted small">Searching…</p>}
+      {loading && <p className="muted small">{query ? 'Searching…' : 'Looking up barcode…'}</p>}
       {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
       {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
         <p className="muted small">No matches. Try a shorter or more generic term.</p>
@@ -154,25 +183,51 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
 
 // ---------- My Foods ----------
 
-function MyFoods({ customFoods, onAddEntry, onDeleteCustomFood, onDone }) {
-  if (!customFoods || customFoods.length === 0) {
-    return <p className="muted small">Nothing saved yet. Save a food from Search or Manual entry to see it here.</p>
+function MyFoods({ customFoods, customRecipes, onAddEntry, onDeleteCustomFood, onDone }) {
+  const hasFoods = customFoods && customFoods.length > 0
+  const hasRecipes = customRecipes && customRecipes.length > 0
+
+  if (!hasFoods && !hasRecipes) {
+    return <p className="muted small">Nothing saved yet. Save a food from Search or Manual entry, or build a recipe from the Pantry tab, to see it here.</p>
   }
+
   return (
     <div>
-      {customFoods.map(food => (
-        <div className="log-entry" key={food.id}>
-          <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { onAddEntry({ ...food, id: Date.now().toString() }); onDone?.() }}>
-            <div className="meal-name">{food.name}</div>
-            <div className="meal-macros">
-              {food.calories} kcal · P{food.protein}g · C{food.carbs}g · F{food.fat}g
-              {food.servingLabel ? ` · ${food.servingLabel}` : ''}
+      {hasRecipes && (
+        <>
+          <p className="muted small" style={{ marginBottom: 6 }}>Your recipes</p>
+          {customRecipes.map(recipe => (
+            <div
+              className="meal-row" key={recipe.id} style={{ cursor: 'pointer' }}
+              onClick={() => { onAddEntry({ id: Date.now().toString(), name: recipe.name, calories: recipe.calories, protein: recipe.protein, carbs: recipe.carbs, fat: recipe.fat }); onDone?.() }}
+            >
+              <div>
+                <div className="meal-name">{recipe.name}</div>
+                <div className="meal-type">{recipe.type}</div>
+              </div>
+              <span className="meal-macros">{recipe.calories} kcal</span>
             </div>
-          </div>
-          <button className="remove-btn" onClick={() => onDeleteCustomFood(food.id)}>×</button>
-        </div>
-      ))}
-      <p className="muted small" style={{ marginTop: 10 }}>Tap a food to log it. Tap × to remove it from this list.</p>
+          ))}
+        </>
+      )}
+      {hasFoods && (
+        <>
+          <p className="muted small" style={{ marginTop: hasRecipes ? 14 : 0, marginBottom: 6 }}>Saved foods</p>
+          {customFoods.map(food => (
+            <div className="log-entry" key={food.id}>
+              <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { onAddEntry({ ...food, id: Date.now().toString() }); onDone?.() }}>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-macros">
+                  {food.calories} kcal · P{food.protein}g · C{food.carbs}g · F{food.fat}g
+                  {food.servingLabel ? ` · ${food.servingLabel}` : ''}
+                </div>
+              </div>
+              <button className="remove-btn" onClick={() => onDeleteCustomFood(food.id)}>×</button>
+            </div>
+          ))}
+        </>
+      )}
+      <p className="muted small" style={{ marginTop: 10 }}>Tap to log. Recipes can be removed from Settings.</p>
     </div>
   )
 }

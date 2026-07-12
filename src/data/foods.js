@@ -72,7 +72,7 @@ export const MEALS = [
     calories: 460, protein: 27, carbs: 40, fat: 20, servingWeightG: 330,
     ingredients: [
       { name: 'Eggs', qty: 2, unit: 'large' },
-      { name: 'Flour tortilla', qty: 1, unit: 'large' },
+      { name: 'Flour tortilla', qty: 1, unit: 'large', isWrapper: true },
       { name: 'Breakfast sausage crumbles', qty: 0.25, unit: 'cup' },
       { name: 'Shredded cheese', qty: 0.25, unit: 'cup' },
       { name: 'Salsa', qty: 2, unit: 'tbsp' },
@@ -99,7 +99,7 @@ export const MEALS = [
     tags: ['meat', 'quick', 'no-cook'],
     calories: 480, protein: 32, carbs: 40, fat: 20, servingWeightG: 340,
     ingredients: [
-      { name: 'Whole wheat tortilla', qty: 1, unit: 'large' },
+      { name: 'Whole wheat tortilla', qty: 1, unit: 'large', isWrapper: true },
       { name: 'Deli turkey', qty: 4, unit: 'oz' },
       { name: 'Bacon (cooked)', qty: 2, unit: 'slices' },
       { name: 'Lettuce', qty: 1, unit: 'cup' },
@@ -114,7 +114,7 @@ export const MEALS = [
     calories: 450, protein: 20, carbs: 52, fat: 17, servingWeightG: 330,
     ingredients: [
       { name: 'Black beans (drained)', qty: 0.5, unit: 'cup' },
-      { name: 'Flour tortilla', qty: 2, unit: 'medium' },
+      { name: 'Flour tortilla', qty: 2, unit: 'medium', isWrapper: true },
       { name: 'Shredded Mexican cheese', qty: 0.5, unit: 'cup' },
       { name: 'Salsa', qty: 2, unit: 'tbsp' },
     ],
@@ -233,7 +233,7 @@ export const MEALS = [
       { name: 'Chicken breast', qty: 6, unit: 'oz' },
       { name: 'Bell pepper', qty: 1, unit: '' },
       { name: 'Onion', qty: 0.5, unit: '' },
-      { name: 'Flour tortillas (small)', qty: 3, unit: '' },
+      { name: 'Flour tortillas (small)', qty: 3, unit: '', isWrapper: true },
       { name: 'Fajita seasoning', qty: 0.5, unit: 'packet' },
     ],
     recipe: 'Slice chicken and veggies, toss with seasoning. Sauté 8-10 min until chicken is cooked through. Serve in tortillas.',

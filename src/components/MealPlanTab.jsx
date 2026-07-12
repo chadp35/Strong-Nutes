@@ -1,10 +1,15 @@
 import React, { useState } from 'react'
-import { scaleMealIngredients, totalBatchWeight, formatIngredient, matchPantryToMeals } from '../lib/mealPlanner.js'
+import {
+  formatIngredient,
+  matchPantryToMeals,
+} from '../lib/mealPlanner.js'
+import AddExtraPanel from './AddExtraPanel.jsx'
+import BulkPrepControls from './BulkPrepControls.jsx'
 
-export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSwapMeal, targets, savedPantry }) {
+export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, targets, savedPantry, personSettings }) {
   const [expanded, setExpanded] = useState(null)
-  const [servingsById, setServingsById] = useState({})
   const [pantryModeKey, setPantryModeKey] = useState(null)
+  const [addPanelDay, setAddPanelDay] = useState(null)
 
   if (!plan) {
     return (
@@ -27,104 +32,129 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
         <button className="secondary" onClick={() => onRegenerate(7)}>Regenerate all</button>
       </div>
       <p className="muted small" style={{ marginBottom: 16 }}>
-        Targeting {targets.calories} kcal/day · {targets.protein}g protein. Tap any meal to swap it.
+        Targeting {targets.calories} kcal/day · {targets.protein}g protein. Real whole meals — extra calories come from additional meals or sides, never resized portions.
       </p>
 
-      {plan.map(day => (
-        <div className="card day-card" key={day.day}>
-          <div className="day-title">Day {day.day} <span className="muted small mono">— {day.totals.calories} kcal</span></div>
-          {day.meals.map((meal, mealIndex) => {
-            const key = `${day.day}-${mealIndex}-${meal.id}`
-            const servings = servingsById[key] || 1
-            const scaled = scaleMealIngredients(meal, servings)
-            const isPantryMode = pantryModeKey === key
-            return (
-              <div key={key}>
-                <div className="meal-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === key ? null : key)}>
-                  <div>
-                    <div className="meal-name">{meal.name}</div>
-                    <div className="meal-type">
-                      {meal.type}{meal.portionMultiplier && meal.portionMultiplier !== 1 ? ` · ${meal.portionMultiplier}× serving` : ''}
+      {plan.map(day => {
+        const coreMeals = day.meals.filter(m => m.isCore)
+        const extraItems = day.meals.filter(m => !m.isCore)
+
+        return (
+          <div className="card day-card" key={day.day}>
+            <div className="day-title">Day {day.day} <span className="muted small mono">— {day.totals.calories} kcal</span></div>
+
+            {coreMeals.map((meal, mealIndex) => {
+              const key = `${day.day}-core-${mealIndex}-${meal.id}`
+              const isPantryMode = pantryModeKey === key
+              return (
+                <div key={key}>
+                  <div className="meal-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === key ? null : key)}>
+                    <div>
+                      <div className="meal-name">{meal.name}</div>
+                      <div className="meal-type">{meal.type}</div>
                     </div>
+                    <span className="meal-macros">{meal.calories} kcal</span>
                   </div>
-                  <span className="meal-macros">{meal.calories} kcal</span>
+                  {expanded === key && (
+                    <div className="meal-detail">
+                      <div style={{ display: 'flex', gap: 8, margin: '8px 0 12px' }}>
+                        <button className="secondary" onClick={() => { onRegenerateMeal(day.day, mealIndex); setPantryModeKey(null) }}>
+                          🔄 Regenerate this meal
+                        </button>
+                        <button className="secondary" onClick={() => setPantryModeKey(isPantryMode ? null : key)}>
+                          🥫 {isPantryMode ? 'Cancel' : 'Use pantry instead'}
+                        </button>
+                      </div>
+
+                      {isPantryMode && (
+                        <PantrySwap
+                          mealType={meal.type}
+                          savedPantry={savedPantry}
+                          excludeIds={[meal.id]}
+                          personSettings={personSettings}
+                          onPick={(replacement) => { onSwapMeal(day.day, mealIndex, replacement); setPantryModeKey(null) }}
+                        />
+                      )}
+
+                      {!isPantryMode && (
+                        <>
+                          <strong>Recipe:</strong> {meal.recipe}
+                          <br />
+                          <span className="mono">P{meal.protein}g · C{meal.carbs}g · F{meal.fat}g per serving</span>
+                          <BulkPrepControls meal={meal} />
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {expanded === key && (
-                  <div className="meal-detail">
-                    <div style={{ display: 'flex', gap: 8, margin: '8px 0 12px' }}>
-                      <button
-                        className="secondary"
-                        onClick={() => { onRegenerateMeal(day.day, mealIndex); setPantryModeKey(null) }}
-                      >
-                        🔄 Regenerate this meal
-                      </button>
-                      <button
-                        className="secondary"
-                        onClick={() => setPantryModeKey(isPantryMode ? null : key)}
-                      >
-                        🥫 {isPantryMode ? 'Cancel' : 'Use pantry instead'}
-                      </button>
-                    </div>
+              )
+            })}
 
-                    {isPantryMode && (
-                      <PantrySwap
-                        mealType={meal.type}
-                        savedPantry={savedPantry}
-                        excludeIds={[meal.id]}
-                        onPick={(replacement) => {
-                          onSwapMeal(day.day, mealIndex, replacement)
-                          setPantryModeKey(null)
-                        }}
-                      />
-                    )}
-
-                    {!isPantryMode && (
-                      <>
-                        <div style={{ marginBottom: 10 }}>
-                          <label style={{ marginBottom: 4 }}>Prepping ahead? Servings to batch:</label>
-                          <input
-                            type="number" min={1} max={14} value={servings}
-                            onChange={e => setServingsById(s => ({ ...s, [key]: Math.max(1, Number(e.target.value) || 1) }))}
-                            style={{ maxWidth: 100 }}
-                          />
+            {extraItems.length > 0 && (
+              <>
+                <p className="muted small" style={{ marginTop: 12, marginBottom: 4 }}>
+                  Additional meals & sides — closes the gap to your target
+                </p>
+                {extraItems.map((item, i) => {
+                  const overallIndex = coreMeals.length + i
+                  const key = `${day.day}-extra-${overallIndex}-${item.id}`
+                  return (
+                    <div key={key}>
+                      <div className="meal-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === key ? null : key)}>
+                        <div>
+                          <div className="meal-name">{item.name}</div>
+                          <div className="meal-type">{item.slotLabel || 'Side'}</div>
                         </div>
-                        <strong>Ingredients{servings > 1 ? ` (×${servings})` : ''}:</strong> {scaled.map(formatIngredient).join(', ')}
-                        <br />
-                        <strong>Recipe:</strong> {meal.recipe}
-                        <br />
-                        <span className="mono">P{meal.protein}g · C{meal.carbs}g · F{meal.fat}g per serving</span>
-                        <br />
-                        {meal.portionMultiplier && meal.portionMultiplier !== 1 && (
-                          <>
-                            <span className="muted">
-                              Sized to {meal.portionMultiplier}× a standard serving to help hit your daily calorie target.
-                            </span>
-                            <br />
-                          </>
-                        )}
-                        <span className="muted">
-                          ≈{meal.servingWeightG}g per portion on a food scale
-                          {servings > 1 ? ` · ≈${totalBatchWeight(meal, servings)}g total for ${servings} servings` : ''}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      ))}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className="meal-macros">{item.calories} kcal</span>
+                          <button className="remove-btn" onClick={e => { e.stopPropagation(); onRemoveMeal(day.day, overallIndex) }}>×</button>
+                        </div>
+                      </div>
+                      {expanded === key && item.recipe && (
+                        <div className="meal-detail">
+                          {item.ingredients?.length > 0 && (
+                            <>
+                              <strong>Ingredients:</strong> {item.ingredients.map(formatIngredient).join(', ')}
+                              <br />
+                            </>
+                          )}
+                          <strong>{item.isExtra ? 'Recipe' : 'How to eat it'}:</strong> {item.recipe}
+                          <br />
+                          <span className="mono">P{item.protein}g · C{item.carbs}g · F{item.fat}g</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </>
+            )}
+
+            <button className="secondary" style={{ width: '100%', marginTop: 12 }} onClick={() => setAddPanelDay(addPanelDay === day.day ? null : day.day)}>
+              {addPanelDay === day.day ? 'Cancel' : '+ Add a meal or side'}
+            </button>
+
+            {addPanelDay === day.day && (
+              <AddExtraPanel
+                remainingCalories={Math.max(targets.calories - day.totals.calories, 0)}
+                remainingProtein={Math.max(targets.protein - day.totals.protein, 0)}
+                personSettings={personSettings}
+                excludeIds={day.meals.map(m => m.id)}
+                onPick={(item, kind) => { onAddExtra(day.day, item, kind); setAddPanelDay(null) }}
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function PantrySwap({ mealType, savedPantry, excludeIds, onPick }) {
+function PantrySwap({ mealType, savedPantry, excludeIds, personSettings, onPick }) {
   const [pantryText, setPantryText] = useState((savedPantry || []).join('\n'))
   const [results, setResults] = useState(null)
 
   function find() {
-    setResults(matchPantryToMeals(pantryText, { type: mealType, excludeIds }))
+    setResults(matchPantryToMeals(pantryText, { type: mealType, excludeIds, personSettings }))
   }
 
   return (
@@ -145,7 +175,7 @@ function PantrySwap({ mealType, savedPantry, excludeIds, onPick }) {
       <button className="secondary" style={{ marginBottom: 10 }} onClick={find}>Find a match</button>
 
       {results && results.length === 0 && <p className="muted small">No matches — try adding a staple or two.</p>}
-      {results && results.map(({ meal, matched, missing }) => (
+      {results && results.map(({ meal, matched }) => (
         <div className="meal-row" key={meal.id} style={{ cursor: 'pointer' }} onClick={() => onPick(meal)}>
           <div>
             <div className="meal-name">{meal.name}</div>

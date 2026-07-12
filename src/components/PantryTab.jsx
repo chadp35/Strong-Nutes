@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
-import { matchPantryToMeals, scaleMealIngredients, totalBatchWeight, formatIngredient } from '../lib/mealPlanner.js'
+import React, { Suspense, useState, lazy } from 'react'
+import { matchPantryToMeals, formatIngredient } from '../lib/mealPlanner.js'
 import { CHAINS, findStoreOptions } from '../data/storeSnacks.js'
+import BulkPrepControls from './BulkPrepControls.jsx'
+
+const RecipeBuilder = lazy(() => import('./RecipeBuilder.jsx'))
 
 const TYPE_OPTIONS = [
   { key: 'any', label: 'Any meal' },
@@ -10,62 +13,59 @@ const TYPE_OPTIONS = [
   { key: 'snack', label: 'Snack' },
 ]
 
-export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remainingTargets }) {
-  const [mode, setMode] = useState('kitchen') // 'kitchen' | 'onthego'
+const MODES = [
+  { key: 'kitchen', label: 'My Pantry' },
+  { key: 'onthego', label: 'On the Go' },
+  { key: 'recipe', label: 'My Recipe' },
+]
+
+export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remainingTargets, allergies, onSaveRecipe, personSettings }) {
+  const [mode, setMode] = useState('kitchen') // 'kitchen' | 'onthego' | 'recipe'
 
   return (
     <div className="app-shell" style={{ paddingTop: 20 }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        <button
-          className="secondary"
-          style={{
-            flex: 1, fontWeight: 700,
-            background: mode === 'kitchen' ? 'var(--fuel)' : 'var(--surface-2)',
-            color: mode === 'kitchen' ? '#12140f' : 'var(--text)',
-            borderColor: mode === 'kitchen' ? 'var(--fuel)' : 'var(--border)',
-          }}
-          onClick={() => setMode('kitchen')}
-        >
-          My Pantry
-        </button>
-        <button
-          className="secondary"
-          style={{
-            flex: 1, fontWeight: 700,
-            background: mode === 'onthego' ? 'var(--fuel)' : 'var(--surface-2)',
-            color: mode === 'onthego' ? '#12140f' : 'var(--text)',
-            borderColor: mode === 'onthego' ? 'var(--fuel)' : 'var(--border)',
-          }}
-          onClick={() => setMode('onthego')}
-        >
-          On the Go
-        </button>
+        {MODES.map(m => (
+          <button
+            key={m.key}
+            className="secondary"
+            style={{
+              flex: 1, fontWeight: 700, fontSize: 13,
+              background: mode === m.key ? 'var(--fuel)' : 'var(--surface-2)',
+              color: mode === m.key ? '#12140f' : 'var(--text)',
+              borderColor: mode === m.key ? 'var(--fuel)' : 'var(--border)',
+            }}
+            onClick={() => setMode(m.key)}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {mode === 'kitchen' && (
-        <KitchenMode savedPantry={savedPantry} onSavePantry={onSavePantry} onLogMeal={onLogMeal} remainingTargets={remainingTargets} />
+        <KitchenMode savedPantry={savedPantry} onSavePantry={onSavePantry} onLogMeal={onLogMeal} remainingTargets={remainingTargets} personSettings={personSettings} />
       )}
       {mode === 'onthego' && (
-        <OnTheGoMode onLogMeal={onLogMeal} remainingTargets={remainingTargets} />
+        <OnTheGoMode onLogMeal={onLogMeal} remainingTargets={remainingTargets} personSettings={personSettings} />
+      )}
+      {mode === 'recipe' && (
+        <Suspense fallback={<p className="muted small">Loading recipe builder…</p>}>
+          <RecipeBuilder allergies={allergies} onSaveRecipe={onSaveRecipe} onDone={() => setMode('kitchen')} />
+        </Suspense>
       )}
     </div>
   )
 }
 
-function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets }) {
+function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, personSettings }) {
   const [pantryText, setPantryText] = useState(savedPantry.join('\n'))
   const [type, setType] = useState('any')
   const [results, setResults] = useState(null)
-  const [servingsById, setServingsById] = useState({})
 
   function handleFind() {
     const items = pantryText.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
     onSavePantry(items)
-    setResults(matchPantryToMeals(pantryText, { type }))
-  }
-
-  function servingsFor(id) {
-    return servingsById[id] || 1
+    setResults(matchPantryToMeals(pantryText, { type, personSettings }))
   }
 
   return (
@@ -105,49 +105,31 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets })
         </div>
       )}
 
-      {results && results.map(({ meal, matched, missing, matchPct }) => {
-        const servings = servingsFor(meal.id)
-        const scaled = scaleMealIngredients(meal, servings)
-        return (
-          <div className="card" key={meal.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-              <h2 style={{ marginBottom: 0, fontSize: 16, color: 'var(--text)', textTransform: 'none', letterSpacing: 0 }}>{meal.name}</h2>
-              <span className="mono small" style={{ color: matchPct === 1 ? 'var(--fuel)' : 'var(--muted)' }}>
-                {matched.length}/{meal.ingredients.length} on hand
-              </span>
-            </div>
-            <p className="meal-type" style={{ marginBottom: 10 }}>{meal.type}</p>
-            <p className="mono small" style={{ marginBottom: 10 }}>
-              {meal.calories} kcal · P{meal.protein}g · C{meal.carbs}g · F{meal.fat}g per serving
-            </p>
-
-            {missing.length > 0 && (
-              <p className="small" style={{ marginBottom: 10 }}>
-                <strong>Missing:</strong> {missing.map(formatIngredient).join(', ')}
-              </p>
-            )}
-
-            <div className="field" style={{ marginBottom: 10 }}>
-              <label>Servings to prep</label>
-              <input
-                type="number" min={1} max={14} value={servings}
-                onChange={e => setServingsById(s => ({ ...s, [meal.id]: Math.max(1, Number(e.target.value) || 1) }))}
-              />
-            </div>
-
-            <p className="small" style={{ marginBottom: 4 }}>
-              <strong>Ingredients{servings > 1 ? ` (×${servings})` : ''}:</strong> {scaled.map(formatIngredient).join(', ')}
-            </p>
-            <p className="small muted" style={{ marginBottom: 10 }}>
-              Portion target: ≈{meal.servingWeightG}g per serving on a food scale
-              {servings > 1 ? ` · ≈${totalBatchWeight(meal, servings)}g total for all ${servings} servings` : ''}
-            </p>
-            <p className="meal-detail" style={{ marginBottom: 12 }}>{meal.recipe}</p>
-
-            <button className="secondary" onClick={() => onLogMeal(meal)}>Log this meal</button>
+      {results && results.map(({ meal, matched, missing, matchPct }) => (
+        <div className="card" key={meal.id}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <h2 style={{ marginBottom: 0, fontSize: 16, color: 'var(--text)', textTransform: 'none', letterSpacing: 0 }}>{meal.name}</h2>
+            <span className="mono small" style={{ color: matchPct === 1 ? 'var(--fuel)' : 'var(--muted)' }}>
+              {matched.length}/{meal.ingredients.length} on hand
+            </span>
           </div>
-        )
-      })}
+          <p className="meal-type" style={{ marginBottom: 10 }}>{meal.type}</p>
+          <p className="mono small" style={{ marginBottom: 10 }}>
+            {meal.calories} kcal · P{meal.protein}g · C{meal.carbs}g · F{meal.fat}g per serving
+          </p>
+
+          {missing.length > 0 && (
+            <p className="small" style={{ marginBottom: 10 }}>
+              <strong>Missing:</strong> {missing.map(formatIngredient).join(', ')}
+            </p>
+          )}
+
+          <p className="meal-detail" style={{ marginBottom: 4 }}>{meal.recipe}</p>
+          <BulkPrepControls meal={meal} />
+
+          <button className="secondary" style={{ marginTop: 12 }} onClick={() => onLogMeal(meal)}>Log this meal</button>
+        </div>
+      ))}
 
       {remainingTargets && (
         <p className="muted small" style={{ textAlign: 'center' }}>
@@ -158,7 +140,7 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets })
   )
 }
 
-function OnTheGoMode({ onLogMeal, remainingTargets }) {
+function OnTheGoMode({ onLogMeal, remainingTargets, personSettings }) {
   const [chainKey, setChainKey] = useState('7eleven')
   const [mealType, setMealType] = useState('any')
   const [results, setResults] = useState(null)
@@ -171,6 +153,7 @@ function OnTheGoMode({ onLogMeal, remainingTargets }) {
       mealType,
       remainingCalories: remainingTargets?.calories,
       remainingProtein: remainingTargets?.protein,
+      personSettings,
     }))
   }
 

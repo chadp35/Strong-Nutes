@@ -10,9 +10,10 @@ import ShoppingListTab from './components/ShoppingListTab.jsx'
 import SettingsTab from './components/SettingsTab.jsx'
 import CoachDashboard from './components/CoachDashboard.jsx'
 import { loadState, saveState, todayKey, defaultState } from './lib/storage.js'
-import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal } from './lib/mealPlanner.js'
+import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal, removeMealAt, addExtraItem } from './lib/mealPlanner.js'
 import { calculateTargets } from './lib/calculations.js'
 import { amICoach } from './lib/coaching.js'
+import { useOnlineStatus } from './lib/useOnlineStatus.js'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -21,6 +22,9 @@ export default function App() {
   const [stateLoading, setStateLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
   const [isCoach, setIsCoach] = useState(false)
+  const [dataSource, setDataSource] = useState('server') // 'server' | 'pending' | 'cache' | 'default'
+  const [synced, setSynced] = useState(true)
+  const isOnline = useOnlineStatus()
   const saveTimer = useRef(null)
 
   // Track auth session
@@ -43,8 +47,10 @@ export default function App() {
       return
     }
     setStateLoading(true)
-    loadState(session.user.id).then(s => {
-      setState(s)
+    loadState(session.user.id).then(({ state: loaded, source }) => {
+      setState(loaded)
+      setDataSource(source)
+      setSynced(source === 'server')
       setStateLoading(false)
     })
     amICoach(session.user.id).then(coach => setIsCoach(!!coach))
@@ -55,10 +61,19 @@ export default function App() {
     if (!session || stateLoading) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      saveState(session.user.id, state, session.user.email)
+      saveState(session.user.id, state, session.user.email).then(({ synced: ok }) => setSynced(ok))
     }, 600)
     return () => clearTimeout(saveTimer.current)
   }, [state, session?.user?.id, stateLoading])
+
+  // The moment connectivity comes back, immediately retry syncing whatever's
+  // currently in memory (which already includes any queued pending save,
+  // since that's what got loaded in) rather than waiting for the next edit.
+  useEffect(() => {
+    if (!isOnline || !session || stateLoading || synced) return
+    saveState(session.user.id, state, session.user.email).then(({ synced: ok }) => setSynced(ok))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline])
 
   function handleOnboardingComplete(profile) {
     setState(s => ({ ...s, profile }))
@@ -74,14 +89,30 @@ export default function App() {
     setState(s => ({ ...s, log: { ...s.log, [key]: (s.log[key] || []).filter(e => e.id !== id) } }))
   }
 
+  // Builds the single object every meal-selection function reads from — one
+  // place that assembles safety filters (allergies, dietary framework),
+  // preference scoring (tags, ingredients, lifestyle), and the person's own
+  // saved recipes, so every call site stays in sync automatically.
+  function buildPersonSettings(s) {
+    const p = s.profile || {}
+    return {
+      likedTags: p.likedTags || [],
+      dislikedTags: p.dislikedTags || [],
+      likedIngredients: p.likedIngredients || [],
+      dislikedIngredients: p.dislikedIngredients || [],
+      allergies: p.allergies || [],
+      dietaryFramework: p.dietaryFramework || 'none',
+      leftoverTolerance: p.leftoverTolerance,
+      lunchTemperature: p.lunchTemperature,
+      customMeals: s.customRecipes || [],
+    }
+  }
+
   function handleRegeneratePlan(days) {
-    const plan = generatePlan({
-      targets: state.profile.targets,
-      likedTags: state.profile.likedTags,
-      dislikedTags: state.profile.dislikedTags,
-      days,
+    setState(s => {
+      const plan = generatePlan({ targets: s.profile.targets, personSettings: buildPersonSettings(s), days })
+      return { ...s, plan, shoppingChecked: {} }
     })
-    setState(s => ({ ...s, plan, shoppingChecked: {} }))
   }
 
   function handleToggleShopItem(key) {
@@ -96,8 +127,7 @@ export default function App() {
         day: s.plan[dayIdx],
         mealIndex,
         targets: s.profile.targets,
-        likedTags: s.profile.likedTags,
-        dislikedTags: s.profile.dislikedTags,
+        personSettings: buildPersonSettings(s),
       })
       const newPlan = [...s.plan]
       newPlan[dayIdx] = newDay
@@ -114,9 +144,30 @@ export default function App() {
         mealIndex,
         replacement,
         targets: s.profile.targets,
-        likedTags: s.profile.likedTags,
-        dislikedTags: s.profile.dislikedTags,
+        personSettings: buildPersonSettings(s),
       })
+      const newPlan = [...s.plan]
+      newPlan[dayIdx] = newDay
+      return { ...s, plan: newPlan, shoppingChecked: {} }
+    })
+  }
+
+  function handleRemoveMeal(dayNumber, index) {
+    setState(s => {
+      const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
+      if (dayIdx === -1) return s
+      const newDay = removeMealAt({ day: s.plan[dayIdx], index })
+      const newPlan = [...s.plan]
+      newPlan[dayIdx] = newDay
+      return { ...s, plan: newPlan, shoppingChecked: {} }
+    })
+  }
+
+  function handleAddExtra(dayNumber, item, kind) {
+    setState(s => {
+      const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
+      if (dayIdx === -1) return s
+      const newDay = addExtraItem({ day: s.plan[dayIdx], item, kind })
       const newPlan = [...s.plan]
       newPlan[dayIdx] = newDay
       return { ...s, plan: newPlan, shoppingChecked: {} }
@@ -125,7 +176,6 @@ export default function App() {
 
   function handleSaveCustomFood(food) {
     setState(s => {
-      // Avoid piling up exact duplicates if they save the same thing twice
       const exists = s.customFoods.some(f => f.name === food.name && f.calories === food.calories)
       if (exists) return s
       return { ...s, customFoods: [food, ...s.customFoods].slice(0, 100) }
@@ -134,6 +184,14 @@ export default function App() {
 
   function handleDeleteCustomFood(id) {
     setState(s => ({ ...s, customFoods: s.customFoods.filter(f => f.id !== id) }))
+  }
+
+  function handleSaveRecipe(recipe) {
+    setState(s => ({ ...s, customRecipes: [recipe, ...s.customRecipes] }))
+  }
+
+  function handleDeleteRecipe(id) {
+    setState(s => ({ ...s, customRecipes: s.customRecipes.filter(r => r.id !== id) }))
   }
 
   function handleSavePantry(items) {
@@ -163,6 +221,14 @@ export default function App() {
 
   function handleSelectCoach(coachId) {
     setState(s => ({ ...s, profile: { ...s.profile, coachId } }))
+  }
+
+  function handleUpdateSafetyProfile(patch) {
+    setState(s => {
+      const newProfile = { ...s.profile, ...patch }
+      const newPlan = s.plan ? generatePlan({ targets: newProfile.targets, personSettings: buildPersonSettings({ ...s, profile: newProfile }), days: s.plan.length }) : s.plan
+      return { ...s, profile: newProfile, plan: newPlan, shoppingChecked: {} }
+    })
   }
 
   function handleChangeWater(delta) {
@@ -201,7 +267,7 @@ export default function App() {
       }
       const targets = { bmr: preview.bmr, tdee: preview.tdee, calories: preview.calories, protein: preview.protein, carbs: preview.carbs, fat: preview.fat }
       const newProfile = { ...s.profile, goalPlan, targets }
-      const newPlan = s.plan ? generatePlan({ targets, likedTags: newProfile.likedTags, dislikedTags: newProfile.dislikedTags, days: s.plan.length }) : s.plan
+      const newPlan = s.plan ? generatePlan({ targets, personSettings: buildPersonSettings({ ...s, profile: newProfile }), days: s.plan.length }) : s.plan
       return { ...s, profile: newProfile, plan: newPlan, shoppingChecked: {} }
     })
   }
@@ -217,9 +283,10 @@ export default function App() {
         age: s.profile.age,
         activityKey: s.profile.activityKey,
         goalKey: s.profile.goalKey,
+        eatingStyle: s.profile.eatingStyle,
       })
       const newProfile = { ...s.profile, goalPlan: null, targets }
-      const newPlan = s.plan ? generatePlan({ targets, likedTags: newProfile.likedTags, dislikedTags: newProfile.dislikedTags, days: s.plan.length }) : s.plan
+      const newPlan = s.plan ? generatePlan({ targets, personSettings: buildPersonSettings({ ...s, profile: newProfile }), days: s.plan.length }) : s.plan
       return { ...s, profile: newProfile, plan: newPlan, shoppingChecked: {} }
     })
   }
@@ -240,6 +307,7 @@ export default function App() {
   const todaysEntries = state.log[todayKey()] || []
   const todaysPlanMeals = state.plan?.[0]?.meals || null
   const shoppingList = state.plan ? generateShoppingList(state.plan) : []
+  const personSettings = buildPersonSettings(state)
 
   const todaysTotals = todaysEntries.reduce(
     (acc, e) => ({
@@ -262,6 +330,17 @@ export default function App() {
             <h1>Strong Nutes</h1>
           </div>
         </div>
+        {!isOnline && (
+          <div className="offline-banner">
+            You're offline — {dataSource === 'cache' ? 'showing your last saved data. ' : ''}
+            Changes are saved on this device and will sync once you're back online.
+          </div>
+        )}
+        {isOnline && !synced && (
+          <div className="offline-banner">
+            Reconnecting to sync your changes…
+          </div>
+        )}
       </div>
 
       {tab === 'dashboard' && (
@@ -276,6 +355,7 @@ export default function App() {
           onDeleteCustomFood={handleDeleteCustomFood}
           todaysWater={state.water[todayKey()] || 0}
           onChangeWater={handleChangeWater}
+          customRecipes={state.customRecipes}
         />
       )}
       {tab === 'plan' && (
@@ -284,8 +364,11 @@ export default function App() {
           onRegenerate={handleRegeneratePlan}
           onRegenerateMeal={handleRegenerateMeal}
           onSwapMeal={handleSwapMeal}
+          onRemoveMeal={handleRemoveMeal}
+          onAddExtra={handleAddExtra}
           targets={state.profile.targets}
           savedPantry={state.pantry}
+          personSettings={personSettings}
         />
       )}
       {tab === 'pantry' && (
@@ -294,6 +377,9 @@ export default function App() {
           onSavePantry={handleSavePantry}
           onLogMeal={handleLogPantryMeal}
           remainingTargets={remainingTargets}
+          allergies={state.profile.allergies || []}
+          onSaveRecipe={handleSaveRecipe}
+          personSettings={personSettings}
         />
       )}
       {tab === 'progress' && (
@@ -322,6 +408,9 @@ export default function App() {
           onStopGoalPlan={handleStopGoalPlan}
           fullState={state}
           onSelectCoach={handleSelectCoach}
+          onUpdateSafetyProfile={handleUpdateSafetyProfile}
+          customRecipes={state.customRecipes}
+          onDeleteRecipe={handleDeleteRecipe}
         />
       )}
 

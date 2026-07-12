@@ -1,0 +1,134 @@
+// Nutrition per 100g of the RAW ingredient (before cooking) — recipes get
+// entered as you'd shop/measure them, and total nutrition doesn't change
+// from cooking heat alone (see recipeBuilder.js for why). Dry goods (rice,
+// oats, pasta) are valued in their dry state, consistent with how the core
+// meal database already handles them.
+//
+// unitGrams gives ingredient-specific conversions for volume/count units
+// (a cup of rice and a cup of spinach weigh very differently). Universal
+// weight units (g/kg/oz/lb) work for every ingredient via WEIGHT_UNITS_TO_GRAMS
+// in recipeBuilder.js and don't need to be repeated here.
+
+export const INGREDIENTS = [
+  // ---- Animal proteins ----
+  { id: 'chicken-breast', name: 'Chicken breast (raw)', category: 'protein', per100g: { calories: 120, protein: 22.5, carbs: 0, fat: 2.6 }, unitGrams: { each: 170 } },
+  { id: 'chicken-thigh', name: 'Chicken thigh (raw, skinless)', category: 'protein', per100g: { calories: 156, protein: 19.6, carbs: 0, fat: 8.2 }, unitGrams: { each: 120 } },
+  { id: 'ground-turkey', name: 'Ground turkey, 93/7 (raw)', category: 'protein', per100g: { calories: 143, protein: 19.3, carbs: 0, fat: 7.1 } },
+  { id: 'turkey-breast', name: 'Turkey breast (raw)', category: 'protein', per100g: { calories: 104, protein: 24, carbs: 0, fat: 0.7 } },
+  { id: 'lean-ground-beef', name: 'Ground beef, 90/10 (raw)', category: 'protein', per100g: { calories: 176, protein: 20, carbs: 0, fat: 10 } },
+  { id: 'ground-beef-8020', name: 'Ground beef, 80/20 (raw)', category: 'protein', per100g: { calories: 254, protein: 17.2, carbs: 0, fat: 20 } },
+  { id: 'sirloin-steak', name: 'Sirloin steak (raw)', category: 'protein', per100g: { calories: 158, protein: 21.6, carbs: 0, fat: 7.4 } },
+  { id: 'flank-steak', name: 'Flank steak (raw)', category: 'protein', per100g: { calories: 172, protein: 21, carbs: 0, fat: 9.1 } },
+  { id: 'pork-chop', name: 'Pork chop (raw)', category: 'protein', per100g: { calories: 143, protein: 21.5, carbs: 0, fat: 5.7 } },
+  { id: 'pork-tenderloin', name: 'Pork tenderloin (raw)', category: 'protein', per100g: { calories: 120, protein: 22, carbs: 0, fat: 3 } },
+  { id: 'bacon', name: 'Bacon (raw)', category: 'protein', per100g: { calories: 458, protein: 12, carbs: 1.4, fat: 45 }, unitGrams: { slice: 28 } },
+  { id: 'egg', name: 'Egg (whole, raw)', category: 'protein', per100g: { calories: 143, protein: 12.6, carbs: 0.7, fat: 9.5 }, unitGrams: { each: 50, large: 50 } },
+  { id: 'egg-white', name: 'Egg white (raw)', category: 'protein', per100g: { calories: 52, protein: 10.9, carbs: 0.7, fat: 0.2 }, unitGrams: { each: 33 } },
+  { id: 'ground-lamb', name: 'Ground lamb (raw)', category: 'protein', per100g: { calories: 282, protein: 16.6, carbs: 0, fat: 23.4 } },
+  { id: 'ground-bison', name: 'Ground bison (raw)', category: 'protein', per100g: { calories: 143, protein: 21, carbs: 0, fat: 6 } },
+
+  // ---- Seafood ----
+  { id: 'white-fish', name: 'White fish — cod/tilapia/mahi/haddock (raw)', category: 'seafood', per100g: { calories: 90, protein: 19.5, carbs: 0, fat: 1 } },
+  { id: 'salmon', name: 'Salmon (raw)', category: 'seafood', per100g: { calories: 208, protein: 20, carbs: 0, fat: 13 } },
+  { id: 'tuna-canned', name: 'Tuna, canned in water (drained)', category: 'seafood', per100g: { calories: 116, protein: 26, carbs: 0, fat: 0.8 } },
+  { id: 'mackerel', name: 'Mackerel (raw)', category: 'seafood', per100g: { calories: 205, protein: 18.6, carbs: 0, fat: 13.9 } },
+  { id: 'shrimp', name: 'Shrimp (raw, peeled)', category: 'seafood', per100g: { calories: 85, protein: 20.3, carbs: 0.2, fat: 0.5 } },
+  { id: 'crab', name: 'Crab meat (cooked)', category: 'seafood', per100g: { calories: 97, protein: 19.4, carbs: 0, fat: 1.5 } },
+  { id: 'lobster', name: 'Lobster meat (cooked)', category: 'seafood', per100g: { calories: 89, protein: 19, carbs: 0.5, fat: 0.9 } },
+  { id: 'mussels', name: 'Mussels (cooked)', category: 'seafood', per100g: { calories: 172, protein: 24, carbs: 7.4, fat: 4.5 } },
+  { id: 'clams', name: 'Clams (cooked)', category: 'seafood', per100g: { calories: 148, protein: 25.5, carbs: 5.1, fat: 1.9 } },
+  { id: 'oysters', name: 'Oysters (raw)', category: 'seafood', per100g: { calories: 68, protein: 7.1, carbs: 3.9, fat: 2.5 } },
+
+  // ---- Plant proteins ----
+  { id: 'tofu-firm', name: 'Tofu, firm', category: 'plant-protein', per100g: { calories: 144, protein: 15.8, carbs: 2.8, fat: 8.7 } },
+  { id: 'tempeh', name: 'Tempeh', category: 'plant-protein', per100g: { calories: 192, protein: 20.3, carbs: 7.6, fat: 10.8 } },
+  { id: 'seitan', name: 'Seitan', category: 'plant-protein', per100g: { calories: 370, protein: 75, carbs: 14, fat: 1.9 } },
+  { id: 'lentils-cooked', name: 'Lentils (cooked)', category: 'plant-protein', per100g: { calories: 116, protein: 9, carbs: 20, fat: 0.4 } },
+  { id: 'black-beans', name: 'Black beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 132, protein: 8.9, carbs: 24, fat: 0.5 } },
+  { id: 'kidney-beans', name: 'Kidney beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 127, protein: 8.7, carbs: 22.8, fat: 0.5 } },
+  { id: 'chickpeas', name: 'Chickpeas (cooked/canned)', category: 'plant-protein', per100g: { calories: 164, protein: 8.9, carbs: 27.4, fat: 2.6 } },
+  { id: 'edamame', name: 'Edamame (shelled)', category: 'plant-protein', per100g: { calories: 122, protein: 11.9, carbs: 8.9, fat: 5.2 } },
+
+  // ---- Carbs / grains ----
+  { id: 'rolled-oats', name: 'Rolled oats (dry)', category: 'carb', per100g: { calories: 389, protein: 16.9, carbs: 66.3, fat: 6.9 }, unitGrams: { cup: 90, tbsp: 5.6 } },
+  { id: 'white-rice', name: 'White rice (dry)', category: 'carb', per100g: { calories: 365, protein: 7.1, carbs: 80, fat: 0.7 }, unitGrams: { cup: 185, tbsp: 11.6 } },
+  { id: 'brown-rice', name: 'Brown rice (dry)', category: 'carb', per100g: { calories: 370, protein: 7.9, carbs: 77.2, fat: 2.9 }, unitGrams: { cup: 190, tbsp: 11.9 } },
+  { id: 'quinoa', name: 'Quinoa (dry)', category: 'carb', per100g: { calories: 368, protein: 14.1, carbs: 64.2, fat: 6.1 }, unitGrams: { cup: 170, tbsp: 10.6 } },
+  { id: 'couscous', name: 'Couscous (dry)', category: 'carb', per100g: { calories: 376, protein: 12.8, carbs: 77.4, fat: 0.6 }, unitGrams: { cup: 173, tbsp: 10.8 } },
+  { id: 'white-potato', name: 'White potato (raw)', category: 'carb', per100g: { calories: 77, protein: 2, carbs: 17.5, fat: 0.1 }, unitGrams: { each: 170, medium: 170 } },
+  { id: 'sweet-potato', name: 'Sweet potato (raw)', category: 'carb', per100g: { calories: 86, protein: 1.6, carbs: 20.1, fat: 0.1 }, unitGrams: { each: 150, medium: 150 } },
+  { id: 'pasta', name: 'Pasta, regular (dry)', category: 'carb', per100g: { calories: 371, protein: 13, carbs: 74.7, fat: 1.5 }, unitGrams: { cup: 100 } },
+  { id: 'whole-wheat-pasta', name: 'Pasta, whole wheat (dry)', category: 'carb', per100g: { calories: 348, protein: 14.6, carbs: 71.9, fat: 2.5 }, unitGrams: { cup: 100 } },
+  { id: 'chickpea-pasta', name: 'Pasta, chickpea (dry)', category: 'carb', per100g: { calories: 355, protein: 21, carbs: 57, fat: 5.4 }, unitGrams: { cup: 100 } },
+  { id: 'bread', name: 'Bread, whole grain', category: 'carb', per100g: { calories: 265, protein: 12.4, carbs: 43.3, fat: 3.6 }, unitGrams: { slice: 32 } },
+  { id: 'flour-tortilla', name: 'Tortilla, flour', category: 'carb', per100g: { calories: 312, protein: 8.2, carbs: 51.4, fat: 7.6 }, unitGrams: { each: 45, medium: 45, large: 60 } },
+  { id: 'corn-tortilla', name: 'Tortilla, corn', category: 'carb', per100g: { calories: 218, protein: 5.7, carbs: 44.6, fat: 2.8 }, unitGrams: { each: 24 } },
+
+  // ---- Vegetables ----
+  { id: 'broccoli', name: 'Broccoli', category: 'vegetable', per100g: { calories: 34, protein: 2.8, carbs: 6.6, fat: 0.4 }, unitGrams: { cup: 91 } },
+  { id: 'cauliflower', name: 'Cauliflower', category: 'vegetable', per100g: { calories: 25, protein: 1.9, carbs: 5, fat: 0.3 }, unitGrams: { cup: 100 } },
+  { id: 'brussels-sprouts', name: 'Brussels sprouts', category: 'vegetable', per100g: { calories: 43, protein: 3.4, carbs: 8.9, fat: 0.3 }, unitGrams: { cup: 88 } },
+  { id: 'cabbage', name: 'Cabbage', category: 'vegetable', per100g: { calories: 25, protein: 1.3, carbs: 5.8, fat: 0.1 }, unitGrams: { cup: 89 } },
+  { id: 'spinach', name: 'Spinach', category: 'vegetable', per100g: { calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4 }, unitGrams: { cup: 30 } },
+  { id: 'kale', name: 'Kale', category: 'vegetable', per100g: { calories: 49, protein: 4.3, carbs: 8.8, fat: 0.9 }, unitGrams: { cup: 67 } },
+  { id: 'arugula', name: 'Arugula', category: 'vegetable', per100g: { calories: 25, protein: 2.6, carbs: 3.7, fat: 0.7 }, unitGrams: { cup: 20 } },
+  { id: 'romaine', name: 'Romaine / mixed greens', category: 'vegetable', per100g: { calories: 17, protein: 1.2, carbs: 3.3, fat: 0.3 }, unitGrams: { cup: 47 } },
+  { id: 'onion', name: 'Onion', category: 'vegetable', per100g: { calories: 40, protein: 1.1, carbs: 9.3, fat: 0.1 }, unitGrams: { each: 110, medium: 110 } },
+  { id: 'garlic', name: 'Garlic', category: 'vegetable', per100g: { calories: 149, protein: 6.4, carbs: 33, fat: 0.5 }, unitGrams: { clove: 3 } },
+  { id: 'leek', name: 'Leek', category: 'vegetable', per100g: { calories: 61, protein: 1.5, carbs: 14.2, fat: 0.3 }, unitGrams: { each: 90 } },
+  { id: 'tomato', name: 'Tomato', category: 'vegetable', per100g: { calories: 18, protein: 0.9, carbs: 3.9, fat: 0.2 }, unitGrams: { each: 120, medium: 120 } },
+  { id: 'bell-pepper', name: 'Bell pepper', category: 'vegetable', per100g: { calories: 31, protein: 1, carbs: 6, fat: 0.3 }, unitGrams: { each: 120 } },
+  { id: 'eggplant', name: 'Eggplant', category: 'vegetable', per100g: { calories: 25, protein: 1, carbs: 5.9, fat: 0.2 }, unitGrams: { cup: 82 } },
+  { id: 'asparagus', name: 'Asparagus', category: 'vegetable', per100g: { calories: 20, protein: 2.2, carbs: 3.9, fat: 0.1 }, unitGrams: { each: 15 } },
+  { id: 'zucchini', name: 'Zucchini', category: 'vegetable', per100g: { calories: 17, protein: 1.2, carbs: 3.1, fat: 0.3 }, unitGrams: { each: 200 } },
+  { id: 'mushroom', name: 'Mushroom', category: 'vegetable', per100g: { calories: 22, protein: 3.1, carbs: 3.3, fat: 0.3 }, unitGrams: { cup: 70 } },
+  { id: 'cucumber', name: 'Cucumber', category: 'vegetable', per100g: { calories: 15, protein: 0.7, carbs: 3.6, fat: 0.1 }, unitGrams: { each: 300 } },
+  { id: 'carrot', name: 'Carrot', category: 'vegetable', per100g: { calories: 41, protein: 0.9, carbs: 9.6, fat: 0.2 }, unitGrams: { each: 60 } },
+  { id: 'green-beans', name: 'Green beans', category: 'vegetable', per100g: { calories: 31, protein: 1.8, carbs: 7, fat: 0.2 }, unitGrams: { cup: 100 } },
+
+  // ---- Fruits ----
+  { id: 'strawberries', name: 'Strawberries', category: 'fruit', per100g: { calories: 32, protein: 0.7, carbs: 7.7, fat: 0.3 }, unitGrams: { cup: 152 } },
+  { id: 'blueberries', name: 'Blueberries', category: 'fruit', per100g: { calories: 57, protein: 0.7, carbs: 14.5, fat: 0.3 }, unitGrams: { cup: 148 } },
+  { id: 'raspberries', name: 'Raspberries', category: 'fruit', per100g: { calories: 52, protein: 1.2, carbs: 11.9, fat: 0.7 }, unitGrams: { cup: 123 } },
+  { id: 'blackberries', name: 'Blackberries', category: 'fruit', per100g: { calories: 43, protein: 1.4, carbs: 9.6, fat: 0.5 }, unitGrams: { cup: 144 } },
+  { id: 'orange', name: 'Orange', category: 'fruit', per100g: { calories: 47, protein: 0.9, carbs: 11.8, fat: 0.1 }, unitGrams: { each: 130 } },
+  { id: 'grapefruit', name: 'Grapefruit', category: 'fruit', per100g: { calories: 42, protein: 0.8, carbs: 10.7, fat: 0.1 }, unitGrams: { each: 230 } },
+  { id: 'lemon', name: 'Lemon', category: 'fruit', per100g: { calories: 29, protein: 1.1, carbs: 9.3, fat: 0.3 }, unitGrams: { each: 60 } },
+  { id: 'lime', name: 'Lime', category: 'fruit', per100g: { calories: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, unitGrams: { each: 67 } },
+  { id: 'mango', name: 'Mango', category: 'fruit', per100g: { calories: 60, protein: 0.8, carbs: 15, fat: 0.4 }, unitGrams: { each: 200 } },
+  { id: 'pineapple', name: 'Pineapple', category: 'fruit', per100g: { calories: 50, protein: 0.5, carbs: 13.1, fat: 0.1 }, unitGrams: { cup: 165 } },
+  { id: 'banana', name: 'Banana', category: 'fruit', per100g: { calories: 89, protein: 1.1, carbs: 22.8, fat: 0.3 }, unitGrams: { each: 118 } },
+  { id: 'peach', name: 'Peach', category: 'fruit', per100g: { calories: 39, protein: 0.9, carbs: 9.5, fat: 0.3 }, unitGrams: { each: 150 } },
+  { id: 'plum', name: 'Plum', category: 'fruit', per100g: { calories: 46, protein: 0.7, carbs: 11.4, fat: 0.3 }, unitGrams: { each: 66 } },
+  { id: 'cherries', name: 'Cherries', category: 'fruit', per100g: { calories: 63, protein: 1.1, carbs: 16, fat: 0.2 }, unitGrams: { cup: 154 } },
+  { id: 'watermelon', name: 'Watermelon', category: 'fruit', per100g: { calories: 30, protein: 0.6, carbs: 7.6, fat: 0.2 }, unitGrams: { cup: 152 } },
+  { id: 'cantaloupe', name: 'Cantaloupe', category: 'fruit', per100g: { calories: 34, protein: 0.8, carbs: 8.2, fat: 0.2 }, unitGrams: { cup: 160 } },
+  { id: 'apple', name: 'Apple', category: 'fruit', per100g: { calories: 52, protein: 0.3, carbs: 13.8, fat: 0.2 }, unitGrams: { each: 182, medium: 182 } },
+  { id: 'pear', name: 'Pear', category: 'fruit', per100g: { calories: 57, protein: 0.4, carbs: 15.2, fat: 0.1 }, unitGrams: { each: 178 } },
+
+  // ---- Dairy & alternatives ----
+  { id: 'greek-yogurt', name: 'Greek yogurt, plain', category: 'dairy', per100g: { calories: 59, protein: 10.2, carbs: 3.6, fat: 0.4 }, unitGrams: { cup: 245 } },
+  { id: 'cottage-cheese', name: 'Cottage cheese', category: 'dairy', per100g: { calories: 98, protein: 11.1, carbs: 3.4, fat: 4.3 }, unitGrams: { cup: 226 } },
+  { id: 'milk-2pct', name: 'Milk, 2%', category: 'dairy', per100g: { calories: 50, protein: 3.3, carbs: 4.8, fat: 2 }, unitGrams: { cup: 244 } },
+  { id: 'cheddar', name: 'Cheddar cheese', category: 'dairy', per100g: { calories: 403, protein: 24.9, carbs: 1.3, fat: 33.1 }, unitGrams: { cup: 113, slice: 28 } },
+  { id: 'parmesan', name: 'Parmesan cheese', category: 'dairy', per100g: { calories: 431, protein: 38.5, carbs: 4.1, fat: 29 }, unitGrams: { tbsp: 5 } },
+  { id: 'feta', name: 'Feta cheese', category: 'dairy', per100g: { calories: 264, protein: 14.2, carbs: 4.1, fat: 21.3 }, unitGrams: { cup: 150 } },
+  { id: 'goat-cheese', name: 'Goat cheese', category: 'dairy', per100g: { calories: 364, protein: 21.6, carbs: 0.1, fat: 29.8 } },
+  { id: 'mozzarella', name: 'Mozzarella', category: 'dairy', per100g: { calories: 280, protein: 27.5, carbs: 3.1, fat: 17.1 }, unitGrams: { cup: 113 } },
+  { id: 'almond-milk', name: 'Almond milk, unsweetened', category: 'dairy', per100g: { calories: 15, protein: 0.6, carbs: 0.6, fat: 1.2 }, unitGrams: { cup: 240 } },
+  { id: 'oat-milk', name: 'Oat milk', category: 'dairy', per100g: { calories: 47, protein: 1, carbs: 7.5, fat: 1.5 }, unitGrams: { cup: 240 } },
+  { id: 'soy-milk', name: 'Soy milk, unsweetened', category: 'dairy', per100g: { calories: 33, protein: 3.3, carbs: 1.8, fat: 1.8 }, unitGrams: { cup: 240 } },
+
+  // ---- Fats, oils, condiments ----
+  { id: 'olive-oil', name: 'Olive oil', category: 'fat', per100g: { calories: 884, protein: 0, carbs: 0, fat: 100 }, unitGrams: { tbsp: 13.5, tsp: 4.5 } },
+  { id: 'butter', name: 'Butter', category: 'fat', per100g: { calories: 717, protein: 0.9, carbs: 0.1, fat: 81.1 }, unitGrams: { tbsp: 14.2, tsp: 4.7 } },
+  { id: 'mayo', name: 'Mayonnaise', category: 'fat', per100g: { calories: 680, protein: 1, carbs: 0.6, fat: 75 }, unitGrams: { tbsp: 13.8, tsp: 4.6 } },
+  { id: 'peanut-butter', name: 'Peanut butter', category: 'fat', per100g: { calories: 588, protein: 25, carbs: 20, fat: 50 }, unitGrams: { tbsp: 16, tsp: 5.3 } },
+  { id: 'almonds', name: 'Almonds', category: 'fat', per100g: { calories: 579, protein: 21.2, carbs: 21.6, fat: 49.9 }, unitGrams: { cup: 143, oz: 28.35 } },
+  { id: 'walnuts', name: 'Walnuts', category: 'fat', per100g: { calories: 654, protein: 15.2, carbs: 13.7, fat: 65.2 }, unitGrams: { cup: 100 } },
+  { id: 'cashews', name: 'Cashews', category: 'fat', per100g: { calories: 553, protein: 18.2, carbs: 30.2, fat: 43.9 }, unitGrams: { cup: 137 } },
+  { id: 'honey', name: 'Honey', category: 'condiment', per100g: { calories: 304, protein: 0.3, carbs: 82.4, fat: 0 }, unitGrams: { tbsp: 21, tsp: 7 } },
+  { id: 'maple-syrup', name: 'Maple syrup', category: 'condiment', per100g: { calories: 260, protein: 0, carbs: 67, fat: 0.2 }, unitGrams: { tbsp: 20, tsp: 6.7 } },
+  { id: 'soy-sauce', name: 'Soy sauce', category: 'condiment', per100g: { calories: 53, protein: 8, carbs: 4.9, fat: 0.6 }, unitGrams: { tbsp: 16, tsp: 5.3 } },
+  { id: 'salsa', name: 'Salsa', category: 'condiment', per100g: { calories: 36, protein: 1.6, carbs: 7.6, fat: 0.2 }, unitGrams: { tbsp: 16, tsp: 5.3 } },
+]

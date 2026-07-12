@@ -4,6 +4,8 @@
 // what's generally/reliably available across most locations of that chain.
 // Exact stock still varies by store, so the label is always the final word.
 
+import { filterExcludedItems } from './allergens.js'
+
 export const CHAINS = [
   // Convenience / gas station
   { key: 'generic_convenience', label: 'Convenience store / gas station (other)', category: 'convenience' },
@@ -109,7 +111,7 @@ const CHAIN_ITEMS = [
   { id: 'cf2x', name: 'Grilled chicken nuggets, 8 ct', chain: 'chickfila', mealType: 'snack', calories: 130, protein: 25, carbs: 1, fat: 3 },
 ]
 
-export function findStoreOptions({ chainKey, remainingCalories, remainingProtein, mealType = 'any' }) {
+export function findStoreOptions({ chainKey, remainingCalories, remainingProtein, mealType = 'any', personSettings = {} }) {
   const chain = CHAINS.find(c => c.key === chainKey)
   if (!chain) return []
 
@@ -118,6 +120,7 @@ export function findStoreOptions({ chainKey, remainingCalories, remainingProtein
     ...CHAIN_ITEMS.filter(i => i.chain === chainKey),
   ]
   if (mealType !== 'any') pool = pool.filter(i => i.mealType === mealType)
+  pool = filterExcludedItems(pool, personSettings)
 
   const withinBudget = pool.filter(i => remainingCalories == null || i.calories <= Math.max(remainingCalories, 100))
   const candidates = withinBudget.length > 0 ? withinBudget : pool

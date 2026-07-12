@@ -4,7 +4,7 @@ import AddFoodPanel from './AddFoodPanel.jsx'
 
 export default function Dashboard({
   profile, todaysEntries, onAddEntry, onRemoveEntry, todaysPlanMeals,
-  customFoods, onSaveCustomFood, onDeleteCustomFood,
+  customFoods, onSaveCustomFood, onDeleteCustomFood, customRecipes,
   todaysWater, onChangeWater,
 }) {
   const [showAdd, setShowAdd] = useState(false)
@@ -79,7 +79,7 @@ export default function Dashboard({
               <div>
                 <div className="meal-name">{meal.name}</div>
                 <div className="meal-type">
-                  {meal.type}{meal.portionMultiplier && meal.portionMultiplier !== 1 ? ` · ${meal.portionMultiplier}×` : ''}
+                  {meal.slotLabel || meal.type}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -100,6 +100,7 @@ export default function Dashboard({
         {showAdd && (
           <AddFoodPanel
             customFoods={customFoods}
+            customRecipes={customRecipes}
             onAddEntry={onAddEntry}
             onSaveCustomFood={onSaveCustomFood}
             onDeleteCustomFood={onDeleteCustomFood}

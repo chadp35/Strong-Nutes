@@ -100,6 +100,17 @@ export default function CoachDashboard({ myUserId }) {
               <span className="mono small muted">{targets.calories || '—'} kcal/day</span>
             </div>
 
+            {(profile.allergies?.length > 0 || (profile.dietaryFramework && profile.dietaryFramework !== 'none')) && (
+              <p className="small" style={{ marginTop: 8, marginBottom: 0, color: profile.allergies?.length ? 'var(--danger)' : 'var(--text)' }}>
+                {profile.allergies?.length > 0 && `⚠️ Allergies: ${profile.allergies.join(', ')}`}
+                {profile.allergies?.length > 0 && profile.dietaryFramework && profile.dietaryFramework !== 'none' && ' · '}
+                {profile.dietaryFramework && profile.dietaryFramework !== 'none' && profile.dietaryFramework}
+              </p>
+            )}
+            {profile.nonNegotiable && (
+              <p className="muted small" style={{ marginTop: 4, marginBottom: 0 }}>Non-negotiable: {profile.nonNegotiable}</p>
+            )}
+
             {latest && (
               <p className="small" style={{ marginTop: 10, marginBottom: 0 }}>
                 Latest weight: <strong>{latest.weightLbs ?? '—'} lbs</strong> ({latest.date})

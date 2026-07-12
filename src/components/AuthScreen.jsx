@@ -25,7 +25,7 @@ export default function AuthScreen() {
         setMode('signin')
       }
     } catch (err) {
-      setError(err.message)
+      setError(!navigator.onLine ? "You're offline — connect to the internet to sign in." : err.message)
     } finally {
       setLoading(false)
     }

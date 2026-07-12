@@ -8,14 +8,55 @@ across devices.
 ## What's in this version
 - **Real accounts** — email/password sign-up and sign-in via Supabase Auth. Each person's data is private to them.
 - **Perpetual memory** — profile, log, meal plan, and pantry are stored in a Postgres database (Supabase), not the browser. Sign in from any device and it's all there.
-- **Today tab** — BMR-based targets, running daily log, one-tap logging of today's planned meals, a water tracker, and an Add Food panel with three ways to log: branded food search (real products via Open Food Facts), My Foods (anything you've saved before), and manual entry.
-- **Plan tab** — generates a 7-day meal plan scaled to actually hit your calorie target, with per-meal editing: regenerate just one meal, or swap in a pantry match for that specific slot. Each meal shows a servings-to-prep control with approximate portion weight for measuring on a food scale.
-- **Pantry tab** — type in what you've got on hand, ranks meals by ingredient overlap, tells you what's missing.
-- **Progress tab** — optional body composition tracking: weight plus any measurements someone wants (waist, quads, calves, bust, hips). Prompts for a check-in roughly once a week without being pushy about it, shows a weight trend chart, exports the full history as CSV, and shows any comments/reactions from a coach if the person has one assigned.
-- **Timed goal plans** — in Onboarding (optional) or anytime in Settings: say how many lbs to lose or gain, and it suggests three timeframes ranked easiest-to-hardest, flags aggressive paces, and builds in a flexible calorie range. Starting, changing, or stopping a plan immediately updates targets and regenerates the meal plan to match.
-- **On the Go** (inside the Pantry tab) — pick a specific chain (7-Eleven, RaceTrac, Dollar General, Wawa, AAFES Shoppette, Publix, Chick-fil-A, and about 20 others) and get realistic grab-and-go options ranked against what's left in your day. This is a curated reference database at the chain level, **not live inventory for one specific location** — no free API exists for that, and stock still varies store to store. Always double-check the label.
-- **Coach-client system** — clients can optionally choose a coach in Settings. The assigned coach gets a dashboard showing each client's targets, recent 7-day logging adherence, and body-comp check-in history, with the ability to leave comments and 💪 reactions on specific check-ins — the client sees and can reply to those on their own Progress tab. Chad Penson (`chadp35@gmail.com`) is the only coach for now; see the one-time SQL step below for how that's set up, and how to add more coaches later.
+- **Today tab** — BMR-based targets, running daily log, one-tap logging of today's planned meals, a water tracker, and an Add Food panel with four ways to log: branded food search, **barcode scanning**, My Foods, and manual entry.
+- **Plan tab** — generates a 7-day meal plan scaled to actually hit your calorie target using real, whole meals — extra calories come from an additional whole meal or grazing-sized sides, never a resized recipe. Per-meal editing (regenerate, pantry-swap), plus **bulk-prep controls** on every meal: scale ingredients for a real batch, then weigh what you actually cooked to get an exact per-portion gram target — accounts for water loss/gain during cooking, which a fixed estimate can't. Wrap-style meals (burritos, quesadillas, fajitas) split the tortilla out from the bulk-cooked filling automatically.
+- **Pantry tab** — three modes: "My Pantry" matches meals to what you have; "On the Go" gives chain-level grab-and-go picks (21 chains — 7-Eleven, RaceTrac, Dollar General, AAFES Shoppette, Publix, and more) ranked against your remaining macros; **"My Recipe"** lets you build a custom recipe from real ingredients and get calculated nutrition — see below.
+- **9-step onboarding wizard** — based on a full dietitian-style intake questionnaire: stats, optional timed goal, allergies & dietary framework (hard excludes, not just preferences), eating style, detailed food preferences by category, texture/flavor profile, kitchen & lifestyle habits, beverages & your "non-negotiable," then review. Every step past the first is skippable — thoroughness is available, not forced.
+- **Progress tab** — optional body composition tracking with a weekly check-in prompt, weight trend chart, CSV export, and coach comments/reactions if you have a coach assigned.
+- **Timed goal plans** — lose/gain N lbs in N weeks, three ranked timeframes, automatic macro + meal plan updates.
+- **Coach-client system** — clients pick a coach in Settings; the coach gets a read-only dashboard of each client's targets, adherence, and check-in history, with comments and 💪 reactions. Chad Penson (`chadp35@gmail.com`) is the only coach for now — see the one-time SQL step below.
 - **Shop tab** — shopping list aggregated and totaled from the week's plan.
+- **Resilient to flaky connectivity** — see "Internet failover" below.
+
+## Internet failover — what's actually covered
+This is a resilience layer, not a full offline-first app (that would mean the
+app itself loading with zero connectivity from a cold start, which needs a
+service worker precaching the app shell — a bigger, separate project). What's
+built now handles the much more common case: **you're using the app and the
+connection drops or hiccups.**
+- **Reading your data**: if Supabase can't be reached, the app falls back to
+  the last successfully loaded copy (cached in `localStorage`) instead of
+  showing a blank/reset app. A banner says so explicitly.
+- **Saving your data**: every save retries a couple of times automatically. If
+  it still fails, the edit gets queued locally instead of silently lost, and
+  syncs automatically the moment the browser reports it's back online — no
+  need to reopen the app or do anything.
+- **Search and barcode lookups** (Open Food Facts): a 10-second timeout so a
+  dead connection fails fast with a clear message instead of hanging
+  indefinitely, plus an upfront offline check.
+- **Sign-in**: a plain "you're offline" message instead of a raw network
+  error if you try to sign in with no connection.
+
+## Barcode scanning
+Uses `@zxing/browser` (camera-based, works on iOS and Android browsers) plus
+Open Food Facts' barcode lookup endpoint — same free API as the text search,
+just by UPC/EAN code instead of a search term. Available from the "Scan"
+button next to food search on the Today tab, and inside "+ Add a meal or
+side" on the Plan tab. If the camera can't be accessed (permission denied, no
+camera, unsupported browser), it falls back to typing the barcode number by
+hand instead of being a dead end. The scanning library is lazy-loaded — it
+only downloads (~450KB) when someone actually taps Scan, so it doesn't slow
+down the app for everyone else.
+
+**One honest caveat**: the exact library API was verified against its shipped
+TypeScript definitions before writing this, so the code matches what the
+library actually exposes — but a live camera stream can't be tested from this
+sandboxed environment. Worth a real test on your phone as the first thing to
+check after deploying.
+
+*No Supabase schema changes for this update* — internet failover, barcode
+scanning, and bulk-prep are all client-side. If you're already on the
+coach-system update, you can skip straight to redeploying the code below.
 
 ## ⚠️ One-time Supabase update if you set this up before the July 2026 update
 This version adds `contact_email` to `app_state`, plus three new tables:
@@ -32,6 +73,56 @@ select id, 'Coach Penson' from auth.users where email = 'chadp35@gmail.com'
 on conflict (user_id) do update set display_name = excluded.display_name;
 ```
 To add another coach later, run the same query with a different email and name.
+
+**This update specifically** adds one more column, `custom_recipes`, for the
+new recipe builder. Same deal — re-run `supabase/schema.sql`, safe on existing
+data. The many new profile fields (allergies, dietary framework, food
+preferences, lifestyle answers, etc.) don't need a schema change at all —
+`profile` is already a flexible jsonb column, so new fields just start
+appearing in it the moment someone fills out the new onboarding steps.
+
+## Custom recipes & the ingredient nutrition engine
+The Pantry tab's "My Recipe" mode lets you build a recipe from real
+ingredients (`src/data/ingredients.js`, ~90 common foods with per-100g
+nutrition and realistic unit conversions — cups, tbsp, oz, "1 medium," etc.)
+and get calculated nutrition facts, with two things most calculators skip:
+
+- **A cooking-loss model that's actually correct.** Cooking heat doesn't
+  destroy calories from protein, carbs, or fat — those macros are chemically
+  stable at cooking temperatures. What changes nutrition is material that's
+  physically removed, like fat drained after browning ground beef. So instead
+  of a made-up "% lost to cooking," there's an explicit "how much fat did you
+  drain" input that does real, defensible math (1 tbsp ≈ 13.5g fat ≈ 120 kcal
+  removed) — and everywhere else, it tells you plainly that macros don't
+  change from heat alone.
+- **Real-weight portioning**, same idea as the bulk-prep feature: raw
+  ingredient weight isn't what a simmered or braised dish weighs once
+  finished (water evaporates or gets absorbed). Weighing the actual cooked
+  result gives an accurate "grams per container" instead of guessing from
+  raw ingredients.
+- **Wrapper-aware bulk cooking** — mark an ingredient (a tortilla, a bun) as
+  a wrapper, and the recipe correctly separates "bulk-cook this filling" from
+  "grab this fresh at serving time," the same distinction `foods.js` already
+  uses for burritos, wraps, and quesadillas.
+
+If an ingredient isn't in the local database, there's a "search the web"
+fallback straight to Open Food Facts, same as branded food search. Once
+saved, a custom recipe is shaped identically to a built-in meal — it flows
+into meal plan generation, pantry matching, the shopping list, and bulk-prep
+controls automatically, with no separate integration needed anywhere.
+
+## Allergy & dietary-framework safety
+`src/data/allergens.js` is keyword-based detection, not certified compliance
+— worth being precise about. It reliably excludes the obvious cases (an
+ingredient literally named "shrimp" trips the shellfish filter) from
+**every** automatic suggestion path: meal plan generation, pantry matching,
+sides, On the Go, and the extra-meal picker. It cannot verify
+cross-contamination, hidden derivatives, or (for halal/kosher specifically)
+actual certification or kosher meat/dairy separation — it excludes pork and
+non-fish seafood for those two, which are the most universal disqualifiers,
+and says so plainly in the UI. These filters only ever apply to what the
+*algorithm* suggests — manually logging or searching for something is never
+blocked, since that's a deliberate choice, not a suggestion.
 
 ## Architecture
 This is a static frontend (Vite + React) talking directly to [Supabase](https://supabase.com)
@@ -79,12 +170,27 @@ It's rule-based, not AI-generated: it normalizes what you typed and checks each
 meal's ingredient list for overlap, then ranks by percentage matched. It's
 instant and needs no API key.
 
-## How the calorie-target scaling works
-Each day's meals get picked first for preference fit, then scaled together by
-one multiplier (clamped between 0.75× and 1.6×) so the day actually lands on
-your calorie target, with an extra snack added if clamping alone can't close
-the gap. Regenerating or swapping a single meal rescales that whole day again
-the same way, so the day total stays accurate no matter how you edit it.
+## How the calorie-target math works
+Breakfast/lunch/dinner are always picked and served at one real, whole
+serving — never resized into fractional ingredients (nobody's measuring 1.55
+tortillas). If there's a meaningful gap left to the calorie target:
+- A gap of 350+ kcal gets filled with another real, whole meal (up to 2 per day).
+- Whatever's left after that (usually under 350 kcal) gets filled with actual
+  grazing-sized sides — fruit, nuts, yogurt, milk, a protein shake — pulled
+  from `src/data/sides.js`, one whole item at a time, never a fraction of one.
+- If the local sides list doesn't have a great fit, "+ Add a meal or side" on
+  the Plan tab has a "Search the web" tab that queries Open Food Facts for a
+  real product to add instead.
+
+Regenerating or swapping a core meal rebuilds the day from scratch against the
+new base, so the extras/sides always stay accurate to whatever's actually
+there. Removing an extra meal or side doesn't auto-refill — add something back
+manually if you want to close the gap again.
+
+Deliberately not automatic: plan *generation* itself never depends on a live
+web request, so it stays fast and never fails because of a network hiccup —
+the web search is there as a manual option when you want it, not a dependency
+the automatic plan relies on.
 
 ## How timed goal plans work
 Uses the standard ~3500 kcal ≈ 1 lb approximation (a simplification — actual
@@ -98,12 +204,14 @@ more than hitting one exact number every day.
 
 ## Continuing development
 Good next things to ask Claude Code for:
-- Real store inventory instead of the curated On the Go list — Kroger has a free developer API with product search; Walmart's requires approval. Either needs a small backend/serverless function to keep the API key off the client, similar to the AI-powered pantry note above.
+- A bigger ingredient database (`src/data/ingredients.js` — same pattern, per-100g raw nutrition + unit conversions) or a real USDA FoodData Central integration for exhaustive coverage
+- Fuzzy/synonym-aware allergen and dietary-framework matching (right now "shrimp" won't match a misspelled "shrimps" or a translated ingredient name)
+- A way to edit the softer preference fields (eating style, lifestyle answers) individually in Settings instead of only via "Redo full setup" — right now only allergies/dietary framework got a dedicated quick-edit
+- Real store inventory instead of the curated On the Go list — Kroger has a free developer API with product search; Walmart's requires approval. Either needs a small backend/serverless function to keep the API key off the client.
 - Smarter pantry matching (fuzzy/partial ingredient matching, or LLM-backed via a serverless function so an Anthropic API key isn't exposed in the browser)
-- A bigger food database (`src/data/foods.js` — follow the existing shape: calories/macros/ingredients are per serving, `servingWeightG` is the approximate plated weight)
 - Coach-side improvements: a way for a coach to see aggregate stats across all clients at a glance, or push a suggested calorie adjustment directly from the dashboard
 - Auto-adjusting goal plans based on actual logged weight trend vs. the plan's projection (the 3500-kcal math is a starting estimate, not a guarantee — real progress should be able to nudge it)
-- Barcode scanning for the branded food search (Open Food Facts supports barcode lookup, not just text search)
+- True offline-first support (service worker precaching the app shell via `vite-plugin-pwa`) if cold-start-with-zero-connectivity ever becomes a real need — what's here now handles mid-session connectivity drops, not a fully offline cold load
 - Magic-link or OAuth (Google/Apple) sign-in — Supabase supports both with minor config changes to `AuthScreen.jsx`
 - Password reset flow (`supabase.auth.resetPasswordForEmail`)
 
@@ -130,21 +238,37 @@ public/
 src/
   lib/
     supabaseClient.js  Supabase client init
-    calculations.js    BMR/TDEE/macro target math (Mifflin-St Jeor)
-    mealPlanner.js      plan generation, shopping list, serving scaling, pantry matching, per-slot regenerate/swap
-    storage.js          load/save the signed-in user's state to Supabase
-    openFoodFacts.js    branded food search (Open Food Facts API)
+    calculations.js    BMR/TDEE/macro target math, timed goal-plan math, eating-style macro splits
+    mealPlanner.js      plan generation (real meals + sides, no scaling), shopping list, pantry matching, per-slot regenerate/swap — all safety-filtered via personSettings
+    recipeBuilder.js      unit conversion, ingredient nutrition totaling, cooking-loss math, serving suggestions
+    storage.js          load/save with retry + local-cache/pending-save failover
+    localCache.js         localStorage read-cache and pending-save queue
+    useOnlineStatus.js     online/offline detection hook
+    openFoodFacts.js    branded food search + barcode lookup (Open Food Facts API), timeout-protected
+    exportData.js        CSV/JSON export helpers
+    coaching.js           coach-client data layer (Supabase queries)
   data/
-    foods.js            meal database (macros, tags, structured ingredients, serving weight, recipe)
+    foods.js            core meal database (breakfast/lunch/dinner/snack; tortilla ingredients flagged isWrapper for bulk-prep)
+    sides.js             small grazing-style gap-filler items
+    storeSnacks.js        On the Go chain-level reference database
+    ingredients.js         raw ingredient nutrition database for the recipe builder (~90 foods)
+    allergens.js            allergen/dietary-framework keyword detection — the hard-exclusion safety layer
   components/
     AuthScreen.jsx       sign in / sign up
-    Onboarding.jsx
+    Onboarding.jsx         9-step wizard (stats → goal → safety → style → food prefs → texture → lifestyle → beverages → review)
+    GoalPlanner.jsx       timed goal-plan picker (used in Onboarding + Settings)
     Dashboard.jsx
-    AddFoodPanel.jsx     branded search / My Foods / manual entry
+    AddFoodPanel.jsx     branded search / barcode / My Foods (+ My Recipes) / manual entry
     MealPlanTab.jsx
-    PantryTab.jsx
+    AddExtraPanel.jsx     add a meal/side to a day (suggested, web search, or barcode)
+    BulkPrepControls.jsx   batch-scale ingredients + real-weight portioning, wrapper-aware
+    BarcodeScanner.jsx     camera scan with manual-entry fallback (lazy-loaded)
+    RecipeBuilder.jsx      custom recipe nutrition calculator (lazy-loaded)
+    PantryTab.jsx          My Pantry + On the Go + My Recipe modes
+    ProgressTab.jsx        body composition tracking
     ShoppingListTab.jsx
-    SettingsTab.jsx
+    SettingsTab.jsx        includes safety-profile quick-edit (allergies/dietary framework) and recipe management
+    CoachDashboard.jsx     coach-facing client list, now surfacing allergies/diet/non-negotiable
     Gauge.jsx
-  App.jsx                auth + data sync + tab routing
+  App.jsx                auth + data sync + tab routing + personSettings assembly
 ```
