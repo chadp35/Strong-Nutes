@@ -5,10 +5,14 @@ import Onboarding from './components/Onboarding.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import MealPlanTab from './components/MealPlanTab.jsx'
 import PantryTab from './components/PantryTab.jsx'
+import ProgressTab from './components/ProgressTab.jsx'
 import ShoppingListTab from './components/ShoppingListTab.jsx'
 import SettingsTab from './components/SettingsTab.jsx'
+import CoachDashboard from './components/CoachDashboard.jsx'
 import { loadState, saveState, todayKey, defaultState } from './lib/storage.js'
-import { generatePlan, generateShoppingList } from './lib/mealPlanner.js'
+import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal } from './lib/mealPlanner.js'
+import { calculateTargets } from './lib/calculations.js'
+import { amICoach } from './lib/coaching.js'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -16,6 +20,7 @@ export default function App() {
   const [state, setState] = useState(defaultState)
   const [stateLoading, setStateLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
+  const [isCoach, setIsCoach] = useState(false)
   const saveTimer = useRef(null)
 
   // Track auth session
@@ -34,6 +39,7 @@ export default function App() {
   useEffect(() => {
     if (!session) {
       setState(defaultState)
+      setIsCoach(false)
       return
     }
     setStateLoading(true)
@@ -41,6 +47,7 @@ export default function App() {
       setState(s)
       setStateLoading(false)
     })
+    amICoach(session.user.id).then(coach => setIsCoach(!!coach))
   }, [session?.user?.id])
 
   // Debounced save to Supabase on any state change (after initial load)
@@ -48,7 +55,7 @@ export default function App() {
     if (!session || stateLoading) return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      saveState(session.user.id, state)
+      saveState(session.user.id, state, session.user.email)
     }, 600)
     return () => clearTimeout(saveTimer.current)
   }, [state, session?.user?.id, stateLoading])
@@ -81,6 +88,54 @@ export default function App() {
     setState(s => ({ ...s, shoppingChecked: { ...s.shoppingChecked, [key]: !s.shoppingChecked[key] } }))
   }
 
+  function handleRegenerateMeal(dayNumber, mealIndex) {
+    setState(s => {
+      const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
+      if (dayIdx === -1) return s
+      const newDay = regenerateDayMeal({
+        day: s.plan[dayIdx],
+        mealIndex,
+        targets: s.profile.targets,
+        likedTags: s.profile.likedTags,
+        dislikedTags: s.profile.dislikedTags,
+      })
+      const newPlan = [...s.plan]
+      newPlan[dayIdx] = newDay
+      return { ...s, plan: newPlan, shoppingChecked: {} }
+    })
+  }
+
+  function handleSwapMeal(dayNumber, mealIndex, replacement) {
+    setState(s => {
+      const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
+      if (dayIdx === -1) return s
+      const newDay = swapDayMeal({
+        day: s.plan[dayIdx],
+        mealIndex,
+        replacement,
+        targets: s.profile.targets,
+        likedTags: s.profile.likedTags,
+        dislikedTags: s.profile.dislikedTags,
+      })
+      const newPlan = [...s.plan]
+      newPlan[dayIdx] = newDay
+      return { ...s, plan: newPlan, shoppingChecked: {} }
+    })
+  }
+
+  function handleSaveCustomFood(food) {
+    setState(s => {
+      // Avoid piling up exact duplicates if they save the same thing twice
+      const exists = s.customFoods.some(f => f.name === food.name && f.calories === food.calories)
+      if (exists) return s
+      return { ...s, customFoods: [food, ...s.customFoods].slice(0, 100) }
+    })
+  }
+
+  function handleDeleteCustomFood(id) {
+    setState(s => ({ ...s, customFoods: s.customFoods.filter(f => f.id !== id) }))
+  }
+
   function handleSavePantry(items) {
     setState(s => ({ ...s, pantry: items }))
   }
@@ -104,6 +159,69 @@ export default function App() {
 
   function handleSignOut() {
     supabase.auth.signOut()
+  }
+
+  function handleSelectCoach(coachId) {
+    setState(s => ({ ...s, profile: { ...s.profile, coachId } }))
+  }
+
+  function handleChangeWater(delta) {
+    const key = todayKey()
+    setState(s => {
+      const current = s.water[key] || 0
+      const next = Math.max(0, current + delta)
+      return { ...s, water: { ...s.water, [key]: next } }
+    })
+  }
+
+  function handleAddBodyMetric(entry) {
+    setState(s => ({ ...s, bodyMetrics: [...s.bodyMetrics, entry] }))
+  }
+
+  function handleDeleteBodyMetric(id) {
+    setState(s => ({ ...s, bodyMetrics: s.bodyMetrics.filter(e => e.id !== id) }))
+  }
+
+  // Applies a confirmed goal-plan selection: overwrites active targets with the
+  // goal-plan-adjusted numbers and, if a meal plan already exists, regenerates
+  // it against the new target so everything stays in sync automatically.
+  function handleStartGoalPlan({ goalPlanCore, preview }) {
+    setState(s => {
+      const goalPlan = {
+        status: 'active',
+        type: goalPlanCore.type,
+        targetChangeLbs: goalPlanCore.targetChangeLbs,
+        weeks: goalPlanCore.weeks,
+        tierKey: goalPlanCore.tierKey,
+        startDate: todayKey(),
+        dailyCalorieChange: preview.dailyCalorieChange,
+        wiggleRoom: preview.wiggleRoom,
+        weeklyRateLbs: preview.weeklyRateLbs,
+        isAggressive: preview.isAggressive,
+      }
+      const targets = { bmr: preview.bmr, tdee: preview.tdee, calories: preview.calories, protein: preview.protein, carbs: preview.carbs, fat: preview.fat }
+      const newProfile = { ...s.profile, goalPlan, targets }
+      const newPlan = s.plan ? generatePlan({ targets, likedTags: newProfile.likedTags, dislikedTags: newProfile.dislikedTags, days: s.plan.length }) : s.plan
+      return { ...s, profile: newProfile, plan: newPlan, shoppingChecked: {} }
+    })
+  }
+
+  // Reverts to the flat percentage-based goal from onboarding and, again,
+  // regenerates the meal plan to match if one exists.
+  function handleStopGoalPlan() {
+    setState(s => {
+      const targets = calculateTargets({
+        sex: s.profile.sex,
+        weightKg: s.profile.weightKg,
+        heightCm: s.profile.heightCm,
+        age: s.profile.age,
+        activityKey: s.profile.activityKey,
+        goalKey: s.profile.goalKey,
+      })
+      const newProfile = { ...s.profile, goalPlan: null, targets }
+      const newPlan = s.plan ? generatePlan({ targets, likedTags: newProfile.likedTags, dislikedTags: newProfile.dislikedTags, days: s.plan.length }) : s.plan
+      return { ...s, profile: newProfile, plan: newPlan, shoppingChecked: {} }
+    })
   }
 
   if (authLoading) {
@@ -140,8 +258,8 @@ export default function App() {
       <div className="app-shell">
         <div className="topbar">
           <div className="brand">
-            <div className="brand-mark">F</div>
-            <h1>Fuel</h1>
+            <div className="brand-mark">S</div>
+            <h1>Strong Nutes</h1>
           </div>
         </div>
       </div>
@@ -153,10 +271,22 @@ export default function App() {
           onAddEntry={handleAddEntry}
           onRemoveEntry={handleRemoveEntry}
           todaysPlanMeals={todaysPlanMeals}
+          customFoods={state.customFoods}
+          onSaveCustomFood={handleSaveCustomFood}
+          onDeleteCustomFood={handleDeleteCustomFood}
+          todaysWater={state.water[todayKey()] || 0}
+          onChangeWater={handleChangeWater}
         />
       )}
       {tab === 'plan' && (
-        <MealPlanTab plan={state.plan} onRegenerate={handleRegeneratePlan} targets={state.profile.targets} />
+        <MealPlanTab
+          plan={state.plan}
+          onRegenerate={handleRegeneratePlan}
+          onRegenerateMeal={handleRegenerateMeal}
+          onSwapMeal={handleSwapMeal}
+          targets={state.profile.targets}
+          savedPantry={state.pantry}
+        />
       )}
       {tab === 'pantry' && (
         <PantryTab
@@ -166,8 +296,20 @@ export default function App() {
           remainingTargets={remainingTargets}
         />
       )}
+      {tab === 'progress' && (
+        <ProgressTab
+          bodyMetrics={state.bodyMetrics}
+          onAddEntry={handleAddBodyMetric}
+          onDeleteEntry={handleDeleteBodyMetric}
+          myUserId={session.user.id}
+          hasCoach={!!state.profile.coachId}
+        />
+      )}
       {tab === 'shopping' && (
         <ShoppingListTab list={shoppingList} checked={state.shoppingChecked} onToggle={handleToggleShopItem} />
+      )}
+      {tab === 'coach' && isCoach && (
+        <CoachDashboard myUserId={session.user.id} />
       )}
       {tab === 'settings' && (
         <SettingsTab
@@ -176,6 +318,10 @@ export default function App() {
           onEdit={() => setState(s => ({ ...s, profile: null }))}
           onReset={handleReset}
           onSignOut={handleSignOut}
+          onStartGoalPlan={handleStartGoalPlan}
+          onStopGoalPlan={handleStopGoalPlan}
+          fullState={state}
+          onSelectCoach={handleSelectCoach}
         />
       )}
 
@@ -190,9 +336,17 @@ export default function App() {
           <button className={`tab ${tab === 'pantry' ? 'active' : ''}`} onClick={() => setTab('pantry')}>
             <span className="tab-icon">✻</span>Pantry
           </button>
+          <button className={`tab ${tab === 'progress' ? 'active' : ''}`} onClick={() => setTab('progress')}>
+            <span className="tab-icon">📈</span>Progress
+          </button>
           <button className={`tab ${tab === 'shopping' ? 'active' : ''}`} onClick={() => setTab('shopping')}>
             <span className="tab-icon">▦</span>Shop
           </button>
+          {isCoach && (
+            <button className={`tab ${tab === 'coach' ? 'active' : ''}`} onClick={() => setTab('coach')}>
+              <span className="tab-icon">👥</span>Coach
+            </button>
+          )}
           <button className={`tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>
             <span className="tab-icon">⚙</span>Settings
           </button>

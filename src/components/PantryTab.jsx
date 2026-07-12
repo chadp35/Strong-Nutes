@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { matchPantryToMeals, scaleMealIngredients, totalBatchWeight, formatIngredient } from '../lib/mealPlanner.js'
+import { CHAINS, findStoreOptions } from '../data/storeSnacks.js'
 
 const TYPE_OPTIONS = [
   { key: 'any', label: 'Any meal' },
@@ -10,6 +11,48 @@ const TYPE_OPTIONS = [
 ]
 
 export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remainingTargets }) {
+  const [mode, setMode] = useState('kitchen') // 'kitchen' | 'onthego'
+
+  return (
+    <div className="app-shell" style={{ paddingTop: 20 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <button
+          className="secondary"
+          style={{
+            flex: 1, fontWeight: 700,
+            background: mode === 'kitchen' ? 'var(--fuel)' : 'var(--surface-2)',
+            color: mode === 'kitchen' ? '#12140f' : 'var(--text)',
+            borderColor: mode === 'kitchen' ? 'var(--fuel)' : 'var(--border)',
+          }}
+          onClick={() => setMode('kitchen')}
+        >
+          My Pantry
+        </button>
+        <button
+          className="secondary"
+          style={{
+            flex: 1, fontWeight: 700,
+            background: mode === 'onthego' ? 'var(--fuel)' : 'var(--surface-2)',
+            color: mode === 'onthego' ? '#12140f' : 'var(--text)',
+            borderColor: mode === 'onthego' ? 'var(--fuel)' : 'var(--border)',
+          }}
+          onClick={() => setMode('onthego')}
+        >
+          On the Go
+        </button>
+      </div>
+
+      {mode === 'kitchen' && (
+        <KitchenMode savedPantry={savedPantry} onSavePantry={onSavePantry} onLogMeal={onLogMeal} remainingTargets={remainingTargets} />
+      )}
+      {mode === 'onthego' && (
+        <OnTheGoMode onLogMeal={onLogMeal} remainingTargets={remainingTargets} />
+      )}
+    </div>
+  )
+}
+
+function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets }) {
   const [pantryText, setPantryText] = useState(savedPantry.join('\n'))
   const [type, setType] = useState('any')
   const [results, setResults] = useState(null)
@@ -26,8 +69,7 @@ export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remain
   }
 
   return (
-    <div className="app-shell" style={{ paddingTop: 20 }}>
-      <h1 style={{ fontSize: 20, marginBottom: 4 }}>What's in your kitchen?</h1>
+    <div>
       <p className="muted small" style={{ marginBottom: 16 }}>
         List what you've got — one item per line or comma-separated — and I'll find meals built for your macros that use it.
       </p>
@@ -112,6 +154,73 @@ export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remain
           Remaining today: {Math.max(remainingTargets.calories, 0)} kcal · {Math.max(remainingTargets.protein, 0)}g protein
         </p>
       )}
+    </div>
+  )
+}
+
+function OnTheGoMode({ onLogMeal, remainingTargets }) {
+  const [chainKey, setChainKey] = useState('7eleven')
+  const [mealType, setMealType] = useState('any')
+  const [results, setResults] = useState(null)
+
+  const chain = CHAINS.find(c => c.key === chainKey)
+
+  function find() {
+    setResults(findStoreOptions({
+      chainKey,
+      mealType,
+      remainingCalories: remainingTargets?.calories,
+      remainingProtein: remainingTargets?.protein,
+    }))
+  }
+
+  return (
+    <div>
+      <p className="muted small" style={{ marginBottom: 4 }}>
+        Generally available picks by chain — not live inventory for one specific location, so double-check the label. Ranked to fit what's left in your day.
+      </p>
+      {remainingTargets && (
+        <p className="mono small muted" style={{ marginBottom: 16 }}>
+          Remaining today: {Math.max(Math.round(remainingTargets.calories), 0)} kcal · {Math.max(Math.round(remainingTargets.protein), 0)}g protein
+        </p>
+      )}
+
+      <div className="card">
+        <div className="field">
+          <label>Where are you?</label>
+          <select value={chainKey} onChange={e => setChainKey(e.target.value)}>
+            {CHAINS.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          {chain?.note && <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>{chain.note}</p>}
+        </div>
+        <div className="field">
+          <label>Looking for</label>
+          <select value={mealType} onChange={e => setMealType(e.target.value)}>
+            <option value="any">Anything</option>
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">A real meal</option>
+            <option value="snack">Just a snack</option>
+          </select>
+        </div>
+        <button className="primary" onClick={find}>Find options</button>
+      </div>
+
+      {results && results.length === 0 && (
+        <div className="empty-state">
+          <h3>Nothing quite fits</h3>
+          <p className="small">Try "Anything" for the meal filter, or a nearby chain type.</p>
+        </div>
+      )}
+
+      {results && results.map(item => (
+        <div className="meal-row" key={item.id}>
+          <div>
+            <div className="meal-name">{item.name}</div>
+            <div className="meal-macros">{item.calories} kcal · P{item.protein}g · C{item.carbs}g · F{item.fat}g</div>
+          </div>
+          <button className="secondary" onClick={() => onLogMeal(item)}>Log it</button>
+        </div>
+      ))}
     </div>
   )
 }

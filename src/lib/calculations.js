@@ -23,23 +23,98 @@ export const GOALS = {
   gain: { label: 'Build muscle', calorieAdjust: 0.12, proteinPerKg: 1.8 },
 }
 
+// Splits a calorie total into protein/carbs/fat grams. Protein is set by
+// bodyweight (higher for a cut to protect muscle), fat held near 28% of total,
+// carbs fill whatever's left. Shared by the flat-percentage goal calculator
+// and the timed goal-plan calculator so both produce consistent macro splits.
+function macroSplitForCalories(calories, weightKg, proteinPerKg) {
+  const protein = Math.round(proteinPerKg * weightKg)
+  const proteinCals = protein * 4
+  const fatCals = calories * 0.28
+  const fat = Math.round(fatCals / 9)
+  const remainingCals = Math.max(calories - proteinCals - fatCals, 0)
+  const carbs = Math.round(remainingCals / 4)
+  return { protein, carbs, fat }
+}
+
 // Returns { calories, protein, carbs, fat } in grams (calories in kcal)
 export function calculateTargets({ sex, weightKg, heightCm, age, activityKey, goalKey }) {
   const bmr = calculateBMR({ sex, weightKg, heightCm, age })
   const tdee = calculateTDEE(bmr, activityKey)
   const goal = GOALS[goalKey]
   const calories = Math.round(tdee * (1 + goal.calorieAdjust))
-
-  const protein = Math.round(goal.proteinPerKg * weightKg)
-  const proteinCals = protein * 4
-
-  const fatCals = calories * 0.28 // fat fixed near ~28% of total, rest goes to carbs
-  const fat = Math.round(fatCals / 9)
-
-  const remainingCals = Math.max(calories - proteinCals - fatCals, 0)
-  const carbs = Math.round(remainingCals / 4)
-
+  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, goal.proteinPerKg)
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), calories, protein, carbs, fat }
+}
+
+// ---------- Timed goal plans (lose/gain N lbs in N weeks) ----------
+
+// The classic ~3500 kcal ≈ 1 lb of fat approximation. It's a simplification
+// (individual metabolic adaptation varies) but it's the standard starting
+// point this kind of calculator is built on, RP Strength included.
+const KCAL_PER_LB = 3500
+
+// Three timeframes per direction, ordered easiest-to-sustain first. Rates are
+// % of bodyweight lost/gained per week — the standard way trainers reason
+// about pace. Loss can safely run faster than gain, since lean gain is capped
+// by how fast muscle can actually be built before the surplus turns to fat.
+export const GOAL_TIMEFRAME_TIERS = {
+  lose: [
+    { key: 'gradual', label: 'Gradual', pctPerWeek: 0.005, blurb: 'Easiest to stick to, minimal muscle loss risk' },
+    { key: 'moderate', label: 'Moderate', pctPerWeek: 0.0075, blurb: 'A solid default for most people' },
+    { key: 'aggressive', label: 'Aggressive', pctPerWeek: 0.01, blurb: 'Fastest, but harder to sustain and more muscle-loss risk' },
+  ],
+  gain: [
+    { key: 'gradual', label: 'Gradual', pctPerWeek: 0.0015, blurb: 'Slowest, leanest gains' },
+    { key: 'moderate', label: 'Moderate', pctPerWeek: 0.0025, blurb: 'A solid default for most people' },
+    { key: 'aggressive', label: 'Aggressive', pctPerWeek: 0.005, blurb: 'Fastest, but more of the gain will be fat' },
+  ],
+}
+
+// Given a goal direction and how much weight to change, returns 3 candidate
+// timeframes (in weeks) ranked easiest-to-hardest, for the person to pick from.
+export function suggestGoalTimeframes({ type, targetChangeLbs, weightLbs }) {
+  const tiers = GOAL_TIMEFRAME_TIERS[type]
+  return tiers.map(t => {
+    const weeklyLbs = weightLbs * t.pctPerWeek
+    const weeks = Math.max(1, Math.round(targetChangeLbs / weeklyLbs))
+    return { ...t, weeks, weeklyLbs: Math.round(weeklyLbs * 100) / 100 }
+  })
+}
+
+// Builds the actual daily calorie/macro targets for a chosen (or custom) goal
+// timeframe. Includes a "wiggle room" buffer — since what actually matters is
+// the weekly average, not hitting one exact number every single day — and
+// flags whether the resulting pace is more aggressive than generally advised.
+export function buildGoalPlanTargets({ type, targetChangeLbs, weeks, bmr, tdee, weightKg, weightLbs }) {
+  const days = Math.max(weeks, 1) * 7
+  const totalCalorieChange = targetChangeLbs * KCAL_PER_LB
+  const dailyChangeMagnitude = Math.round(totalCalorieChange / days)
+  const dailyCalorieChange = type === 'lose' ? -dailyChangeMagnitude : dailyChangeMagnitude
+
+  // Hard floor so the math never recommends something unsafe regardless of input
+  const calories = Math.max(Math.round(tdee + dailyCalorieChange), 1200)
+  const proteinPerKg = type === 'lose' ? 2.0 : 1.8
+  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, proteinPerKg)
+
+  const wiggleRoom = Math.min(Math.max(Math.round(dailyChangeMagnitude * 0.25), 75), 250)
+
+  const weeklyRateLbs = (dailyChangeMagnitude * 7) / KCAL_PER_LB
+  const weeklyRatePct = (weeklyRateLbs / weightLbs) * 100
+  const isAggressive = type === 'lose' ? weeklyRatePct > 1 : weeklyRatePct > 0.6
+
+  return {
+    bmr: Math.round(bmr),
+    tdee: Math.round(tdee),
+    calories,
+    protein,
+    carbs,
+    fat,
+    dailyCalorieChange,
+    wiggleRoom,
+    weeklyRateLbs: Math.round(weeklyRateLbs * 100) / 100,
+    isAggressive,
+  }
 }
 
 export function lbsToKg(lbs) {

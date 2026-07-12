@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { calculateTargets, lbsToKg, ftInToCm, ACTIVITY_MULTIPLIERS, GOALS } from '../lib/calculations.js'
 import { ALL_TAGS } from '../data/foods.js'
+import GoalPlanner from './GoalPlanner.jsx'
 
 // Reasonable placeholder stats so the live calculator has something to show
 // the instant the screen loads, before the person has typed anything.
@@ -16,6 +17,7 @@ export default function Onboarding({ onComplete }) {
   const [goalKey, setGoalKey] = useState('maintain')
   const [likedTags, setLikedTags] = useState([])
   const [dislikedTags, setDislikedTags] = useState([])
+  const [goalPlanResult, setGoalPlanResult] = useState(null) // { goalPlanCore, preview } or null
 
   function toggleTag(tag, list, setList, otherList, setOther) {
     if (list.includes(tag)) {
@@ -44,10 +46,30 @@ export default function Onboarding({ onComplete }) {
   function handleSubmit() {
     const weightKg = lbsToKg(Number(weightLbs))
     const heightCm = ftInToCm(Number(feet), Number(inches || 0))
-    const targets = calculateTargets({ sex, weightKg, heightCm, age: Number(age), activityKey, goalKey })
+    const baseTargets = calculateTargets({ sex, weightKg, heightCm, age: Number(age), activityKey, goalKey })
+
+    let targets = baseTargets
+    let goalPlan = null
+    if (goalPlanResult) {
+      const { goalPlanCore, preview } = goalPlanResult
+      targets = { bmr: preview.bmr, tdee: preview.tdee, calories: preview.calories, protein: preview.protein, carbs: preview.carbs, fat: preview.fat }
+      goalPlan = {
+        status: 'active',
+        type: goalPlanCore.type,
+        targetChangeLbs: goalPlanCore.targetChangeLbs,
+        weeks: goalPlanCore.weeks,
+        tierKey: goalPlanCore.tierKey,
+        startDate: new Date().toISOString().slice(0, 10),
+        dailyCalorieChange: preview.dailyCalorieChange,
+        wiggleRoom: preview.wiggleRoom,
+        weeklyRateLbs: preview.weeklyRateLbs,
+        isAggressive: preview.isAggressive,
+      }
+    }
+
     onComplete({
       sex, weightKg, heightCm, age: Number(age), activityKey, goalKey,
-      likedTags, dislikedTags, targets,
+      likedTags, dislikedTags, targets, goalPlan,
     })
   }
 
@@ -128,6 +150,32 @@ export default function Onboarding({ onComplete }) {
       </div>
 
       <div className="card">
+        <h2>Timed goal (optional)</h2>
+        {!isRealStats && (
+          <p className="muted small" style={{ marginBottom: 0 }}>Fill in your stats above first — the goal calculator needs your weight and BMR.</p>
+        )}
+        {isRealStats && !goalPlanResult && (
+          <GoalPlanner
+            weightLbs={Number(weightLbs)}
+            weightKg={lbsToKg(Number(weightLbs))}
+            bmr={liveTargets.bmr}
+            tdee={liveTargets.tdee}
+            onStart={setGoalPlanResult}
+            onSkip={() => {}}
+          />
+        )}
+        {isRealStats && goalPlanResult && (
+          <div>
+            <p className="small" style={{ marginBottom: 10 }}>
+              <strong>{goalPlanResult.goalPlanCore.type === 'lose' ? 'Lose' : 'Gain'} {goalPlanResult.goalPlanCore.targetChangeLbs} lbs</strong> over {goalPlanResult.goalPlanCore.weeks} weeks —
+              {' '}{goalPlanResult.preview.calories} kcal/day
+            </p>
+            <button className="secondary" onClick={() => setGoalPlanResult(null)}>Remove this goal</button>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
         <h2>Foods you like</h2>
         <p className="muted small" style={{ marginTop: -6, marginBottom: 12 }}>Tap to like (green). Tap again to remove.</p>
         <div className="tag-grid" style={{ marginBottom: 16 }}>
@@ -157,7 +205,9 @@ export default function Onboarding({ onComplete }) {
       </div>
 
       <button className="primary" disabled={!canSubmit} onClick={handleSubmit} style={{ opacity: canSubmit ? 1 : 0.5 }}>
-        {canSubmit ? `Lock in ${liveTargets.calories} kcal/day & start planning` : 'Fill in your stats to continue'}
+        {canSubmit
+          ? `Lock in ${goalPlanResult ? goalPlanResult.preview.calories : liveTargets.calories} kcal/day & start planning`
+          : 'Fill in your stats to continue'}
       </button>
     </div>
   )

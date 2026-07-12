@@ -1,9 +1,14 @@
 import React, { useState } from 'react'
 import Gauge from './Gauge.jsx'
+import AddFoodPanel from './AddFoodPanel.jsx'
 
-export default function Dashboard({ profile, todaysEntries, onAddEntry, onRemoveEntry, todaysPlanMeals }) {
+export default function Dashboard({
+  profile, todaysEntries, onAddEntry, onRemoveEntry, todaysPlanMeals,
+  customFoods, onSaveCustomFood, onDeleteCustomFood,
+  todaysWater, onChangeWater,
+}) {
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' })
+  const WATER_TARGET_CUPS = 8
 
   const totals = todaysEntries.reduce(
     (acc, e) => ({
@@ -16,20 +21,6 @@ export default function Dashboard({ profile, todaysEntries, onAddEntry, onRemove
   )
 
   const t = profile.targets
-
-  function submitAdd() {
-    if (!form.name || !form.calories) return
-    onAddEntry({
-      id: Date.now().toString(),
-      name: form.name,
-      calories: Number(form.calories) || 0,
-      protein: Number(form.protein) || 0,
-      carbs: Number(form.carbs) || 0,
-      fat: Number(form.fat) || 0,
-    })
-    setForm({ name: '', calories: '', protein: '', carbs: '', fat: '' })
-    setShowAdd(false)
-  }
 
   function quickLogMeal(meal) {
     onAddEntry({
@@ -55,6 +46,29 @@ export default function Dashboard({ profile, todaysEntries, onAddEntry, onRemove
         <Gauge label="Protein" value={totals.protein} target={t.protein} color="var(--protein)" />
         <Gauge label="Carbs" value={totals.carbs} target={t.carbs} color="var(--carb)" />
         <Gauge label="Fat" value={totals.fat} target={t.fat} color="var(--fat)" />
+        {profile.goalPlan && (
+          <p className="muted small" style={{ marginTop: 12, marginBottom: 0 }}>
+            {profile.goalPlan.type === 'lose' ? 'Losing' : 'Gaining'} toward {profile.goalPlan.targetChangeLbs} lbs ·
+            {' '}flexible range {t.calories - profile.goalPlan.wiggleRoom}–{t.calories + profile.goalPlan.wiggleRoom} kcal
+          </p>
+        )}
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h2 style={{ marginBottom: 0 }}>💧 Water</h2>
+          <span className="mono small muted">{todaysWater} / {WATER_TARGET_CUPS} cups</span>
+        </div>
+        <div className="gauge-track" style={{ marginBottom: 14 }}>
+          <div
+            className="gauge-fill"
+            style={{ width: `${Math.min((todaysWater / WATER_TARGET_CUPS) * 100, 100)}%`, background: 'var(--carb)' }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="secondary" style={{ flex: 1 }} onClick={() => onChangeWater(-1)} disabled={todaysWater <= 0}>− 1 cup</button>
+          <button className="secondary" style={{ flex: 1 }} onClick={() => onChangeWater(1)}>+ 1 cup</button>
+        </div>
       </div>
 
       {todaysPlanMeals?.length > 0 && (
@@ -64,7 +78,9 @@ export default function Dashboard({ profile, todaysEntries, onAddEntry, onRemove
             <div className="meal-row" key={meal.id}>
               <div>
                 <div className="meal-name">{meal.name}</div>
-                <div className="meal-type">{meal.type}</div>
+                <div className="meal-type">
+                  {meal.type}{meal.portionMultiplier && meal.portionMultiplier !== 1 ? ` · ${meal.portionMultiplier}×` : ''}
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="meal-macros">{meal.calories} kcal</span>
@@ -82,33 +98,13 @@ export default function Dashboard({ profile, todaysEntries, onAddEntry, onRemove
         </div>
 
         {showAdd && (
-          <div style={{ marginBottom: 16 }}>
-            <div className="field">
-              <label>Food name</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Chicken sandwich" />
-            </div>
-            <div className="row field">
-              <div>
-                <label>Calories</label>
-                <input type="number" value={form.calories} onChange={e => setForm({ ...form, calories: e.target.value })} placeholder="450" />
-              </div>
-              <div>
-                <label>Protein (g)</label>
-                <input type="number" value={form.protein} onChange={e => setForm({ ...form, protein: e.target.value })} placeholder="30" />
-              </div>
-            </div>
-            <div className="row field">
-              <div>
-                <label>Carbs (g)</label>
-                <input type="number" value={form.carbs} onChange={e => setForm({ ...form, carbs: e.target.value })} placeholder="40" />
-              </div>
-              <div>
-                <label>Fat (g)</label>
-                <input type="number" value={form.fat} onChange={e => setForm({ ...form, fat: e.target.value })} placeholder="15" />
-              </div>
-            </div>
-            <button className="primary" onClick={submitAdd}>Add to log</button>
-          </div>
+          <AddFoodPanel
+            customFoods={customFoods}
+            onAddEntry={onAddEntry}
+            onSaveCustomFood={onSaveCustomFood}
+            onDeleteCustomFood={onDeleteCustomFood}
+            onDone={() => setShowAdd(false)}
+          />
         )}
 
         {todaysEntries.length === 0 && !showAdd && (

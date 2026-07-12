@@ -35,8 +35,8 @@ export default function AuthScreen() {
     <div className="app-shell" style={{ paddingTop: 60, maxWidth: 400 }}>
       <div className="topbar" style={{ justifyContent: 'center', marginBottom: 24 }}>
         <div className="brand">
-          <div className="brand-mark">F</div>
-          <h1>Fuel</h1>
+          <div className="brand-mark">S</div>
+          <h1>Strong Nutes</h1>
         </div>
       </div>
       <div className="card">
