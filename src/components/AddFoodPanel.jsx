@@ -9,11 +9,58 @@ const SUBTABS = [
   { key: 'manual', label: 'Manual' },
 ]
 
-export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered }) {
+export const MEAL_SLOTS = [
+  { key: 'breakfast', label: 'Breakfast' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'dinner', label: 'Dinner' },
+  { key: 'snack', label: 'Snack' },
+]
+
+// A reasonable time-of-day guess so the meal-slot picker starts on the right
+// answer most of the time instead of always defaulting to one fixed value.
+export function guessMealSlot(now = new Date()) {
+  const hour = now.getHours()
+  if (hour < 11) return 'breakfast'
+  if (hour < 15) return 'lunch'
+  if (hour < 21) return 'dinner'
+  return 'snack'
+}
+
+export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered, defaultMealSlot }) {
   const [subtab, setSubtab] = useState('search')
+  const [mealSlot, setMealSlot] = useState(defaultMealSlot || guessMealSlot())
+
+  // Every entry added from any of the three subtabs below gets tagged with
+  // whichever meal slot is picked here, so non-planned "just adding food"
+  // entries still show up organized under Breakfast/Lunch/Dinner/Snack
+  // instead of an undifferentiated pile.
+  function taggedAddEntry(entry) {
+    onAddEntry({ ...entry, mealSlot })
+  }
 
   return (
     <div style={{ marginBottom: 16 }}>
+      <div className="field">
+        <label>Which meal is this for?</label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {MEAL_SLOTS.map(s => (
+            <button
+              key={s.key}
+              className="secondary"
+              style={{
+                flex: 1, fontSize: 12, fontWeight: 700, padding: '8px 4px',
+                background: mealSlot === s.key ? 'var(--fuel)' : 'var(--surface-2)',
+                color: mealSlot === s.key ? 'var(--on-fuel)' : 'var(--text)',
+                borderColor: mealSlot === s.key ? 'var(--fuel)' : 'var(--border)',
+              }}
+              onClick={() => setMealSlot(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         {SUBTABS.map(t => (
           <button
@@ -34,13 +81,13 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
       </div>
 
       {subtab === 'search' && (
-        <BrandedSearch onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} />
+        <BrandedSearch onAddEntry={taggedAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} />
       )}
       {subtab === 'mine' && (
-        <MyFoods customFoods={customFoods} customRecipes={customRecipes} onAddEntry={onAddEntry} onDeleteCustomFood={onDeleteCustomFood} onDone={onDone} />
+        <MyFoods customFoods={customFoods} customRecipes={customRecipes} onAddEntry={taggedAddEntry} onDeleteCustomFood={onDeleteCustomFood} onDone={onDone} />
       )}
       {subtab === 'manual' && (
-        <ManualEntry onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
+        <ManualEntry onAddEntry={taggedAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
       )}
     </div>
   )
@@ -94,7 +141,8 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone, discoveredProduct
   }
 
   function logSelected(alsoSave) {
-    const macros = macrosForGrams(selected, grams)
+    const gramsNum = Number(grams) || 0
+    const macros = macrosForGrams(selected, gramsNum)
     const entry = {
       id: Date.now().toString(),
       name: selected.brand ? `${selected.name} (${selected.brand})` : selected.name,
@@ -103,7 +151,7 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone, discoveredProduct
     onAddEntry(entry)
     onRecordDiscovered?.(selected)
     if (alsoSave) {
-      onSaveCustomFood({ id: `custom-${Date.now()}`, name: entry.name, ...macros, servingLabel: `${grams}g` })
+      onSaveCustomFood({ id: `custom-${Date.now()}`, name: entry.name, ...macros, servingLabel: `${gramsNum}g` })
     }
     setSelected(null)
     setQuery('')
@@ -112,14 +160,14 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone, discoveredProduct
   }
 
   if (selected) {
-    const macros = macrosForGrams(selected, grams)
+    const macros = macrosForGrams(selected, Number(grams) || 0)
     return (
       <div>
         <p className="meal-name" style={{ marginBottom: 2 }}>{selected.name}</p>
         {selected.brand && <p className="muted small" style={{ marginBottom: 10 }}>{selected.brand}</p>}
         <div className="field">
           <label>Amount (grams)</label>
-          <input type="number" value={grams} onChange={e => setGrams(Number(e.target.value) || 0)} />
+          <input type="number" value={grams} onChange={e => { const v = e.target.value; setGrams(v === '' ? '' : Number(v)) }} />
           <p className="muted small" style={{ marginTop: 4 }}>Typical serving: {selected.servingLabel}</p>
         </div>
         <p className="mono small" style={{ marginBottom: 14 }}>

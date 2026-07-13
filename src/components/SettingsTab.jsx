@@ -2,9 +2,79 @@ import React, { useEffect, useState } from 'react'
 import { GOALS, ACTIVITY_MULTIPLIERS, EATING_STYLES, kgToLbs } from '../lib/calculations.js'
 import { exportAllDataJSON } from '../lib/exportData.js'
 import { listCoaches } from '../lib/coaching.js'
+import { submitFeedback } from '../lib/feedback.js'
 import { ALLERGEN_OPTIONS, DIETARY_FRAMEWORK_OPTIONS } from '../data/allergens.js'
 import { THEMES, getStoredTheme, setStoredTheme } from '../lib/theme.js'
 import GoalPlanner from './GoalPlanner.jsx'
+
+const FEEDBACK_TYPES = [
+  { key: 'bug', label: '🐞 Bug' },
+  { key: 'idea', label: '💡 Idea' },
+  { key: 'other', label: '💬 Other' },
+]
+
+function FeedbackForm({ userId, userEmail }) {
+  const [type, setType] = useState('bug')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function send() {
+    if (!message.trim()) return
+    setSending(true)
+    const ok = await submitFeedback({ userId, userEmail, type, message: message.trim(), page: 'settings' })
+    setSending(false)
+    if (ok) {
+      setSent(true)
+      setMessage('')
+      setTimeout(() => setSent(false), 4000)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Feedback &amp; bug reports</h2>
+      <p className="muted small" style={{ marginBottom: 12 }}>
+        Beta testing — found something broken, or have an idea? This goes straight to me.
+      </p>
+      <div className="field">
+        <div style={{ display: 'flex', gap: 6 }}>
+          {FEEDBACK_TYPES.map(t => (
+            <button
+              key={t.key}
+              className="secondary"
+              style={{
+                flex: 1, fontWeight: 700,
+                background: type === t.key ? 'var(--fuel)' : 'var(--surface-2)',
+                color: type === t.key ? 'var(--on-fuel)' : 'var(--text)',
+                borderColor: type === t.key ? 'var(--fuel)' : 'var(--border)',
+              }}
+              onClick={() => setType(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          rows={4}
+          placeholder={type === 'bug' ? "What happened, and what did you expect instead?" : "What's on your mind?"}
+          style={{
+            width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)',
+            color: 'var(--text)', padding: '11px 12px', borderRadius: 10, fontSize: 15,
+            fontFamily: 'Inter', resize: 'vertical',
+          }}
+        />
+      </div>
+      <button className="primary" style={{ width: '100%', opacity: message.trim() ? 1 : 0.5 }} disabled={!message.trim() || sending} onClick={send}>
+        {sending ? 'Sending…' : sent ? 'Sent — thank you!' : 'Send feedback'}
+      </button>
+    </div>
+  )
+}
 
 function ThemePicker() {
   const [theme, setTheme] = useState(getStoredTheme())
@@ -55,7 +125,7 @@ const LUNCH_TEMP_LABELS = {
 }
 
 export default function SettingsTab({
-  profile, userEmail, onEdit, onReset, onSignOut,
+  profile, userEmail, userId, onEdit, onReset, onSignOut,
   onStartGoalPlan, onStopGoalPlan, fullState,
   onSelectCoach, onUpdateSafetyProfile,
   customRecipes, onDeleteRecipe, onEditRecipe,
@@ -94,6 +164,8 @@ export default function SettingsTab({
         <h2>Appearance</h2>
         <ThemePicker />
       </div>
+
+      <FeedbackForm userId={userId} userEmail={userEmail} />
 
       <div className="card" style={{ borderColor: profile.allergies?.length ? 'var(--danger)' : undefined }}>
         <h2>Allergies &amp; dietary framework</h2>

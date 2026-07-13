@@ -12,7 +12,10 @@ import { scaleMealIngredients, formatIngredient, totalBatchWeight } from '../lib
 //   content, not nutrient content. What DOES change is how many grams to put
 //   in each container, which is why weighing the real cooked total matters.
 export default function BulkPrepControls({ meal }) {
-  const [servings, setServings] = useState(1)
+  // Raw string state so the field can go empty while typing instead of
+  // snapping straight back to "1" on every backspace.
+  const [servingsInput, setServingsInput] = useState('1')
+  const servings = Math.max(1, Number(servingsInput) || 1)
   const [actualWeight, setActualWeight] = useState('')
 
   const wrapperIngredients = (meal.ingredients || []).filter(i => i.isWrapper)
@@ -32,8 +35,8 @@ export default function BulkPrepControls({ meal }) {
       <div className="field" style={{ marginBottom: 10 }}>
         <label>Batch cooking? Servings to make</label>
         <input
-          type="number" min={1} max={20} value={servings}
-          onChange={e => setServings(Math.max(1, Number(e.target.value) || 1))}
+          type="number" min={1} max={20} value={servingsInput}
+          onChange={e => setServingsInput(e.target.value)}
           style={{ maxWidth: 100 }}
         />
       </div>

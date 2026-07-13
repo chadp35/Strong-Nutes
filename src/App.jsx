@@ -9,6 +9,7 @@ import ProgressTab from './components/ProgressTab.jsx'
 import ShoppingListTab from './components/ShoppingListTab.jsx'
 import SettingsTab from './components/SettingsTab.jsx'
 import CoachDashboard from './components/CoachDashboard.jsx'
+import AdminFeedbackTab from './components/AdminFeedbackTab.jsx'
 import { loadState, saveState, todayKey, defaultState } from './lib/storage.js'
 import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal, removeMealAt, addExtraItem, replaceMealAt } from './lib/mealPlanner.js'
 import { calculateTargets } from './lib/calculations.js'
@@ -85,14 +86,42 @@ export default function App() {
     setState(s => ({ ...s, profile }))
   }
 
+  // Stamps every entry with the moment it was actually logged — the entry
+  // still lives under state.log[today] (that's what ties it to a specific
+  // calendar day), but loggedAt gives an exact time so "logged today" is
+  // never ambiguous even right around a midnight rollover, and lets the
+  // Today tab show when each item was logged.
+  //
+  // Also gives every entry a base* snapshot + portion:100 baseline (unless
+  // it already carries its own, e.g. a plan meal logged at a scaled amount) —
+  // this is what the Today tab's portion slider adjusts against, so dragging
+  // back to 100% always exactly restores the originally-logged amount instead
+  // of drifting from repeated rescale-and-round passes.
   function handleAddEntry(entry) {
     const key = today
-    setState(s => ({ ...s, log: { ...s.log, [key]: [...(s.log[key] || []), entry] } }))
+    const tagged = {
+      loggedAt: new Date().toISOString(),
+      baseCalories: entry.calories, baseProtein: entry.protein, baseCarbs: entry.carbs, baseFat: entry.fat,
+      portion: 100,
+      ...entry,
+    }
+    setState(s => ({ ...s, log: { ...s.log, [key]: [...(s.log[key] || []), tagged] } }))
   }
 
   function handleRemoveEntry(id) {
     const key = today
     setState(s => ({ ...s, log: { ...s.log, [key]: (s.log[key] || []).filter(e => e.id !== id) } }))
+  }
+
+  // Adjusts a logged entry in place — used by the Today tab's portion slider
+  // to rescale calories/protein/carbs/fat on an already-logged item without
+  // creating a new entry or losing its original loggedAt timestamp.
+  function handleEditEntry(id, patch) {
+    const key = today
+    setState(s => ({
+      ...s,
+      log: { ...s.log, [key]: (s.log[key] || []).map(e => (e.id === id ? { ...e, ...patch } : e)) },
+    }))
   }
 
   // Builds the single object every meal-selection function reads from — one
@@ -350,6 +379,11 @@ export default function App() {
     return <Onboarding onComplete={handleOnboardingComplete} />
   }
 
+  // Gates the beta feedback admin tab to just the app owner — matches the
+  // Supabase RLS policy on the feedback table (auth.jwt()->>'email'), so
+  // this is purely a UI convenience; the real restriction is server-side.
+  const isOwner = session.user.email === 'chadp35@gmail.com'
+
   const todaysEntries = state.log[today] || []
   // Today's plan card should reflect whichever plan day is actually today's
   // calendar date — not always array index 0, which used to mean "today's
@@ -401,7 +435,16 @@ export default function App() {
           todaysEntries={todaysEntries}
           onAddEntry={handleAddEntry}
           onRemoveEntry={handleRemoveEntry}
+          onEditEntry={handleEditEntry}
           todaysPlanMeals={todaysPlanMeals}
+          todaysPlanDay={todaysPlanDay}
+          onReplaceMeal={handleReplaceMeal}
+          onRegenerateMeal={handleRegenerateMeal}
+          onSwapMeal={handleSwapMeal}
+          onRemoveMeal={handleRemoveMeal}
+          targets={state.profile.targets}
+          savedPantry={state.pantry}
+          personSettings={personSettings}
           customFoods={state.customFoods}
           onSaveCustomFood={handleSaveCustomFood}
           onDeleteCustomFood={handleDeleteCustomFood}
@@ -462,10 +505,14 @@ export default function App() {
       {tab === 'coach' && isCoach && (
         <CoachDashboard myUserId={session.user.id} />
       )}
+      {tab === 'feedback' && isOwner && (
+        <AdminFeedbackTab />
+      )}
       {tab === 'settings' && (
         <SettingsTab
           profile={state.profile}
           userEmail={session.user.email}
+          userId={session.user.id}
           onEdit={() => setState(s => ({ ...s, profile: null }))}
           onReset={handleReset}
           onSignOut={handleSignOut}
@@ -500,6 +547,11 @@ export default function App() {
           {isCoach && (
             <button className={`tab ${tab === 'coach' ? 'active' : ''}`} onClick={() => setTab('coach')}>
               <span className="tab-icon">👥</span>Coach
+            </button>
+          )}
+          {isOwner && (
+            <button className={`tab ${tab === 'feedback' ? 'active' : ''}`} onClick={() => setTab('feedback')}>
+              <span className="tab-icon">🐞</span>Feedback
             </button>
           )}
           <button className={`tab ${tab === 'settings' ? 'active' : ''}`} onClick={() => setTab('settings')}>

@@ -55,12 +55,17 @@ h1, h2, h3 {
 
 #root { min-height: 100vh; display: flex; flex-direction: column; }
 
-.app-shell { max-width: 720px; margin: 0 auto; width: 100%; padding: 0 20px 100px; flex: 1; }
+/* env(safe-area-inset-*) resolves to real pixel insets on iOS when the app
+   is added to the home screen (viewport-fit=cover, set in index.html, is
+   required for these to be non-zero) — accounts for the notch/Dynamic
+   Island/status bar up top and the home-indicator bar down below, which
+   otherwise sit right on top of the brand title and the outer tab buttons. */
+.app-shell { max-width: 720px; margin: 0 auto; width: 100%; padding: 0 20px calc(100px + env(safe-area-inset-bottom)); flex: 1; }
 
 /* Top bar */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 22px 0 10px;
+  padding: calc(22px + env(safe-area-inset-top)) 0 10px;
 }
 .topbar .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark {
@@ -76,6 +81,7 @@ h1, h2, h3 {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: var(--surface); border-top: 1px solid var(--border);
   display: flex; justify-content: center; z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .tabbar-inner { max-width: 720px; width: 100%; display: flex; }
 .tab {

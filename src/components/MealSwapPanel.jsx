@@ -207,14 +207,14 @@ function WebSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
   }
 
   if (selected) {
-    const macros = macrosForGrams(selected, grams)
+    const macros = macrosForGrams(selected, Number(grams) || 0)
     return (
       <div>
         <p className="meal-name" style={{ marginBottom: 2 }}>{selected.name}</p>
         {selected.brand && <p className="muted small" style={{ marginBottom: 10 }}>{selected.brand}</p>}
         <div className="field">
           <label>Amount (grams)</label>
-          <input type="number" value={grams} onChange={e => setGrams(Number(e.target.value) || 0)} />
+          <input type="number" value={grams} onChange={e => { const v = e.target.value; setGrams(v === '' ? '' : Number(v)) }} />
         </div>
         <p className="mono small" style={{ marginBottom: 12 }}>
           {macros.calories} kcal · P{macros.protein}g · C{macros.carbs}g · F{macros.fat}g

@@ -58,7 +58,11 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
   const [scanning, setScanning] = useState(false)
   const [drainedFatTbsp, setDrainedFatTbsp] = useState(saved?.drainedFatTbsp ? String(saved.drainedFatTbsp) : '')
   const [actualWeight, setActualWeight] = useState(saved?.actualWeight ? String(saved.actualWeight) : '')
-  const [servings, setServings] = useState(saved?.servings || null)
+  // Kept as a raw string (like drainedFatTbsp/actualWeight below) rather than
+  // a number, so the field can actually go empty while someone's editing it —
+  // binding a number input directly to numeric state means clearing it always
+  // snaps straight back to the fallback value, making backspace look broken.
+  const [servingsInput, setServingsInput] = useState(saved?.servings ? String(saved.servings) : '')
   const [mealType, setMealType] = useState(existingRecipe?.type || 'dinner')
   const [selectedTags, setSelectedTags] = useState(existingRecipe?.tags || [])
   const [notes, setNotes] = useState(existingRecipe?.recipe && existingRecipe.recipe !== 'Custom recipe you created.' ? existingRecipe.recipe : '')
@@ -68,7 +72,7 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
 
   const { totals: rawTotals } = calculateRecipeTotals(lines)
   const adjustedTotals = applyDrainedFat(rawTotals, Number(drainedFatTbsp) || 0)
-  const effectiveServings = servings || suggestServings(adjustedTotals.calories || 500)
+  const effectiveServings = servingsInput !== '' ? Math.max(1, Number(servingsInput) || 1) : suggestServings(adjustedTotals.calories || 500)
   const perServing = computePerServing(adjustedTotals, effectiveServings, Number(actualWeight) || 0)
 
   const conflict = allergies?.length > 0 && conflictsWithAllergies({ ingredients: lines.map(l => ({ name: l.ingredient.name })) }, allergies)
@@ -129,7 +133,7 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
     const s = Math.max(effectiveServings, 1)
     const perServingIngredients = lines.map(l => ({
       name: l.ingredient.name,
-      qty: Math.round((l.qty / s) * 100) / 100,
+      qty: Math.round(((Number(l.qty) || 0) / s) * 100) / 100,
       unit: l.unit === 'serving' ? '' : l.unit,
       ...(l.isWrapper ? { isWrapper: true } : {}),
     }))
@@ -269,7 +273,7 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="number" min={0} step="0.1" value={line.qty}
-                  onChange={e => updateLine(i, { qty: Number(e.target.value) || 0 })}
+                  onChange={e => { const v = e.target.value; updateLine(i, { qty: v === '' ? '' : Number(v) }) }}
                   style={{ width: 80 }}
                 />
                 <select value={line.unit} onChange={e => updateLine(i, { unit: e.target.value })} style={{ flex: 1 }}>
@@ -293,7 +297,7 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
           <div className="card">
             <h2>Raw totals</h2>
             <p className="mono">
-              {rawTotals.calories} kcal · P{Math.round(rawTotals.protein)}g · C{Math.round(rawTotals.carbs)}g · F{Math.round(rawTotals.fat)}g
+              {Math.round(rawTotals.calories)} kcal · P{Math.round(rawTotals.protein)}g · C{Math.round(rawTotals.carbs)}g · F{Math.round(rawTotals.fat)}g
             </p>
             <p className="muted small" style={{ marginBottom: 0 }}>
               Cooking heat doesn't remove calories from protein, carbs, or fat — only material that's
@@ -320,8 +324,9 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
               <label>How many servings does this make?</label>
               <input
                 type="number" min={1} max={20}
-                value={effectiveServings}
-                onChange={e => setServings(Math.max(1, Number(e.target.value) || 1))}
+                value={servingsInput}
+                onChange={e => setServingsInput(e.target.value)}
+                placeholder={String(effectiveServings)}
                 style={{ maxWidth: 100 }}
               />
             </div>

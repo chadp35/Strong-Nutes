@@ -66,15 +66,22 @@ export function toGrams(ingredient, qty, unit) {
 // Nutrition for a specific quantity of a specific ingredient (raw, pre-cook).
 // `ingredient` just needs { per100g, unitGrams? } — works equally for a
 // local database entry or an ad-hoc one built from a web search result.
+// Deliberately NOT rounded here — this feeds into totals that get summed
+// across every ingredient line. Rounding each line first and then summing
+// the rounded values can drift a few kcal/g off the true total (and drift by
+// a DIFFERENT amount depending on how many lines there are or what order
+// they were added in), which is exactly the kind of "the math changed
+// overnight" symptom that's confusing to debug. Round only once, at the
+// final total/per-serving display point.
 export function nutritionForLine(ingredient, qty, unit) {
   const grams = toGrams(ingredient, qty, unit)
   const factor = grams / 100
   return {
     grams,
-    calories: Math.round(ingredient.per100g.calories * factor),
-    protein: Math.round(ingredient.per100g.protein * factor * 10) / 10,
-    carbs: Math.round(ingredient.per100g.carbs * factor * 10) / 10,
-    fat: Math.round(ingredient.per100g.fat * factor * 10) / 10,
+    calories: ingredient.per100g.calories * factor,
+    protein: ingredient.per100g.protein * factor,
+    carbs: ingredient.per100g.carbs * factor,
+    fat: ingredient.per100g.fat * factor,
   }
 }
 

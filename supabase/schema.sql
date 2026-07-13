@@ -193,3 +193,40 @@ create policy "Author can remove their own reaction"
 -- That's the only manual step. Everything else (clients choosing a coach,
 -- the coach dashboard, comments/reactions) works through the app from there.
 -- ============================================================
+
+-- ============================================================
+-- Beta feedback / bug reports
+-- ============================================================
+
+-- Any signed-in user can submit a report; only the app owner (you) can
+-- read or update them. There's no separate "admins" table since there's
+-- exactly one owner — the check is a direct email match on the JWT, same
+-- as how coaches are hard-assigned by you rather than self-service.
+create table if not exists feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
+  user_email text,
+  type text not null default 'bug', -- 'bug' | 'idea' | 'other'
+  message text not null,
+  page text, -- which tab/screen they were on, if provided
+  status text not null default 'open', -- 'open' | 'in_progress' | 'resolved'
+  created_at timestamptz not null default now()
+);
+
+alter table feedback enable row level security;
+
+drop policy if exists "Signed in users can submit feedback" on feedback;
+create policy "Signed in users can submit feedback"
+  on feedback for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Only the app owner can view feedback" on feedback;
+create policy "Only the app owner can view feedback"
+  on feedback for select
+  using (auth.jwt() ->> 'email' = 'chadp35@gmail.com');
+
+drop policy if exists "Only the app owner can update feedback" on feedback;
+create policy "Only the app owner can update feedback"
+  on feedback for update
+  using (auth.jwt() ->> 'email' = 'chadp35@gmail.com');
+-- ============================================================
