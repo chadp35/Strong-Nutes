@@ -7,8 +7,8 @@ export default function Gauge({ label, value, target, unit = 'g', color }) {
     <div className="gauge">
       <div className="gauge-head">
         <span className="gauge-label">{label}</span>
-        <span className="gauge-value mono">
-          {Math.round(value)} / {Math.round(target)}{unit}
+        <span className="gauge-value mono" style={over ? { color: 'var(--danger)' } : undefined}>
+          {Math.round(value)} / {Math.round(target)}{unit}{over ? ' · over' : ''}
         </span>
       </div>
       <div className="gauge-track">

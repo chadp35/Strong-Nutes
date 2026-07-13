@@ -1,12 +1,9 @@
 import React, { useState } from 'react'
 import { formatIngredient } from '../lib/mealPlanner.js'
+import { localDateKey as todayKey } from '../lib/dateKey.js'
 import AddExtraPanel from './AddExtraPanel.jsx'
 import BulkPrepControls from './BulkPrepControls.jsx'
 import MealSwapPanel from './MealSwapPanel.jsx'
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 export default function MealPlanTab({
   plan, onRegenerate, onCancelPlan, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, onReplaceMeal,

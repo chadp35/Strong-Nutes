@@ -173,6 +173,10 @@ export default function App() {
     setState(s => ({ ...s, shoppingChecked: { ...s.shoppingChecked, [key]: !s.shoppingChecked[key] } }))
   }
 
+  function handleClearShopChecks() {
+    setState(s => ({ ...s, shoppingChecked: {} }))
+  }
+
   function handleRegenerateMeal(dayNumber, mealIndex) {
     setState(s => {
       const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
@@ -285,13 +289,14 @@ export default function App() {
   }
 
   function handleReset() {
-    if (confirm('This clears your profile, log, and meal plan. Continue?')) {
+    if (confirm('This permanently deletes EVERYTHING — profile, log, meal plan, pantry, custom recipes, progress history, and water tracking. This cannot be undone. Continue?')) {
       setState({ ...defaultState })
     }
   }
 
-  function handleSignOut() {
-    supabase.auth.signOut()
+  async function handleSignOut() {
+    const { error } = await supabase.auth.signOut()
+    if (error) alert("Couldn't sign out — check your connection and try again.")
   }
 
   function handleSelectCoach(coachId) {
@@ -500,7 +505,7 @@ export default function App() {
         />
       )}
       {tab === 'shopping' && (
-        <ShoppingListTab list={shoppingList} checked={state.shoppingChecked} onToggle={handleToggleShopItem} />
+        <ShoppingListTab list={shoppingList} checked={state.shoppingChecked} onToggle={handleToggleShopItem} onClearChecks={handleClearShopChecks} />
       )}
       {tab === 'coach' && isCoach && (
         <CoachDashboard myUserId={session.user.id} />

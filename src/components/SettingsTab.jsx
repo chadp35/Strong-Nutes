@@ -305,7 +305,7 @@ export default function SettingsTab({
                 <div className="meal-macros">{r.calories} kcal · {r.type}</div>
               </div>
               <button className="secondary" style={{ marginRight: 8 }} onClick={() => onEditRecipe(r)}>Edit</button>
-              <button className="remove-btn" onClick={() => onDeleteRecipe(r.id)}>×</button>
+              <button className="remove-btn" onClick={() => { if (confirm(`Delete "${r.name}"? This can't be undone.`)) onDeleteRecipe(r.id) }}>×</button>
             </div>
           ))}
         </div>
@@ -321,7 +321,15 @@ export default function SettingsTab({
         </button>
       </div>
 
-      <button className="secondary" style={{ width: '100%', marginBottom: 10 }} onClick={onEdit}>Redo full setup</button>
+      <button
+        className="secondary"
+        style={{ width: '100%', marginBottom: 10 }}
+        onClick={() => {
+          if (confirm("This clears your profile answers and sends you back through setup from scratch — your log, plan, pantry, recipes, and progress history are kept. Continue?")) onEdit()
+        }}
+      >
+        Redo full setup
+      </button>
       <button className="secondary" style={{ width: '100%', marginBottom: 10 }} onClick={onSignOut}>Sign out</button>
       <button className="secondary" style={{ width: '100%', color: 'var(--danger)' }} onClick={onReset}>Reset all data</button>
     </div>

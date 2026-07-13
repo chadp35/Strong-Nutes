@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { calculateTargets, lbsToKg, ftInToCm, ACTIVITY_MULTIPLIERS, GOALS, EATING_STYLES } from '../lib/calculations.js'
 import { ALLERGEN_OPTIONS, DIETARY_FRAMEWORK_OPTIONS } from '../data/allergens.js'
+import { localDateKey } from '../lib/dateKey.js'
 import GoalPlanner from './GoalPlanner.jsx'
 
 const PLACEHOLDER = { weightLbs: 170, feet: 5, inches: 8, age: 30 }
@@ -81,7 +82,11 @@ export default function Onboarding({ onComplete }) {
   const [activityKey, setActivityKey] = useState('moderate')
   const [goalKey, setGoalKey] = useState('maintain')
 
-  const canSubmitStats = weightLbs && feet !== '' && age
+  const canSubmitStats =
+    Number(weightLbs) > 0 && Number(weightLbs) < 800 &&
+    feet !== '' && Number(feet) > 0 && Number(feet) < 9 &&
+    (inches === '' || (Number(inches) >= 0 && Number(inches) < 12)) &&
+    Number(age) > 0 && Number(age) < 120
   const isRealStats = weightLbs !== '' && feet !== '' && age !== ''
 
   const liveTargets = useMemo(() => {
@@ -159,7 +164,7 @@ export default function Onboarding({ onComplete }) {
         targetChangeLbs: goalPlanCore.targetChangeLbs,
         weeks: goalPlanCore.weeks,
         tierKey: goalPlanCore.tierKey,
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: localDateKey(),
         dailyCalorieChange: preview.dailyCalorieChange,
         wiggleRoom: preview.wiggleRoom,
         weeklyRateLbs: preview.weeklyRateLbs,
@@ -275,7 +280,7 @@ export default function Onboarding({ onComplete }) {
               bmr={liveTargets.bmr}
               tdee={liveTargets.tdee}
               onStart={setGoalPlanResult}
-              onSkip={() => {}}
+              onSkip={next}
             />
           )}
           {goalPlanResult && (

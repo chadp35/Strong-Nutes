@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { fetchMyClients, fetchComments, fetchReactions, postComment, toggleReaction } from '../lib/coaching.js'
+import { localDateKey } from '../lib/dateKey.js'
 
 function last7Dates() {
   const dates = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    dates.push(d.toISOString().slice(0, 10))
+    dates.push(localDateKey(d))
   }
   return dates
 }
@@ -16,6 +17,8 @@ export default function CoachDashboard({ myUserId }) {
   const [expandedId, setExpandedId] = useState(null)
   const [threads, setThreads] = useState({})
   const [messageDrafts, setMessageDrafts] = useState({})
+  const [sendingComment, setSendingComment] = useState({})
+  const [commentErrors, setCommentErrors] = useState({})
 
   useEffect(() => {
     fetchMyClients(myUserId).then(setClients)
@@ -36,7 +39,14 @@ export default function CoachDashboard({ myUserId }) {
   async function sendComment(clientId) {
     const message = (messageDrafts[clientId] || '').trim()
     if (!message) return
-    await postComment({ clientId, authorId: myUserId, message })
+    setSendingComment(s => ({ ...s, [clientId]: true }))
+    setCommentErrors(er => ({ ...er, [clientId]: false }))
+    const ok = await postComment({ clientId, authorId: myUserId, message })
+    setSendingComment(s => ({ ...s, [clientId]: false }))
+    if (!ok) {
+      setCommentErrors(er => ({ ...er, [clientId]: true }))
+      return
+    }
     const comments = await fetchComments(clientId)
     setThreads(t => ({ ...t, [clientId]: { ...t[clientId], comments } }))
     setMessageDrafts(d => ({ ...d, [clientId]: '' }))
@@ -177,9 +187,21 @@ export default function CoachDashboard({ myUserId }) {
                     value={messageDrafts[client.user_id] || ''}
                     onChange={e => setMessageDrafts(d => ({ ...d, [client.user_id]: e.target.value }))}
                     placeholder="Leave encouragement or feedback…"
+                    disabled={!!sendingComment[client.user_id]}
                   />
                 </div>
-                <button className="primary" onClick={() => sendComment(client.user_id)}>Send</button>
+                {commentErrors[client.user_id] && (
+                  <p className="small" style={{ color: 'var(--danger)', marginBottom: 8 }}>
+                    Couldn't send — check your connection and try again.
+                  </p>
+                )}
+                <button
+                  className="primary"
+                  disabled={!!sendingComment[client.user_id] || !(messageDrafts[client.user_id] || '').trim()}
+                  onClick={() => sendComment(client.user_id)}
+                >
+                  {sendingComment[client.user_id] ? 'Sending…' : 'Send'}
+                </button>
               </div>
             )}
           </div>

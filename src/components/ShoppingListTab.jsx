@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function ShoppingListTab({ list, checked, onToggle }) {
+export default function ShoppingListTab({ list, checked, onToggle, onClearChecks }) {
   if (!list || list.length === 0) {
     return (
       <div className="app-shell" style={{ paddingTop: 20 }}>
@@ -23,6 +23,15 @@ export default function ShoppingListTab({ list, checked, onToggle }) {
       <p className="muted small" style={{ marginBottom: 16 }}>
         Aggregated from your meal plan and converted to real shopping quantities (weight or item counts, not recipe measurements). Works for Walmart, Kroger, or wherever you shop.
       </p>
+      {checkedCount > 0 && (
+        <button
+          className="secondary"
+          style={{ width: '100%', marginBottom: 14 }}
+          onClick={() => { if (confirm('Uncheck everything? Handy for reusing this list on a new trip.')) onClearChecks() }}
+        >
+          Uncheck all ({checkedCount})
+        </button>
+      )}
       <div className="card">
         {list.map(({ key, label }) => (
           <div className={`shop-item ${checked[key] ? 'checked' : ''}`} key={key} onClick={() => onToggle(key)}>

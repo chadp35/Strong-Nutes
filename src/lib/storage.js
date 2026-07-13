@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.js'
 import { getCachedState, setCachedState, getPendingSave, setPendingSave, clearPendingSave } from './localCache.js'
+import { localDateKey } from './dateKey.js'
 
 export const defaultState = {
   profile: null,       // { sex, weightKg, heightCm, age, activityKey, goalKey, likedTags, dislikedTags, targets, goalPlan, coachId, allergies, dietaryFramework, eatingStyle, likedIngredients, dislikedIngredients, leftoverTolerance, cookingComplexity, convenienceLevel, lunchTemperature, beverageNotes, nonNegotiable }
@@ -110,5 +111,5 @@ export async function saveState(userId, state, userEmail) {
 }
 
 export function todayKey() {
-  return new Date().toISOString().slice(0, 10)
+  return localDateKey()
 }

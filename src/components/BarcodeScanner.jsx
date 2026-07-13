@@ -15,12 +15,25 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     const reader = new BrowserMultiFormatReader()
     let cancelled = false
 
+    // The camera's controls can arrive via either the per-frame callback's
+    // 3rd argument OR the promise this call resolves to, depending on timing
+    // — and a fast open-then-close can unmount before EITHER has fired.
+    // Routing both through this one setter means whichever arrives first
+    // (or last, after unmount) always gets a chance to stop the stream, so a
+    // quick close never leaves the camera running in the background.
+    function receiveControls(controls) {
+      controlsRef.current = controls
+      if (cancelled) {
+        try { controls?.stop() } catch { /* already stopped */ }
+      }
+    }
+
     reader
       .decodeFromConstraints(
         { video: { facingMode: 'environment' } },
         videoRef.current,
         (result, err, controls) => {
-          controlsRef.current = controls
+          receiveControls(controls)
           if (cancelled) return
           if (result) {
             cancelled = true
@@ -31,6 +44,7 @@ export default function BarcodeScanner({ onDetected, onClose }) {
           // normal scanning noise, not a real failure, so it's ignored here.
         }
       )
+      .then(controls => receiveControls(controls))
       .catch(err => {
         if (cancelled) return
         const denied = err?.name === 'NotAllowedError' || /permission/i.test(err?.message || '')

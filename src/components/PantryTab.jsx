@@ -89,7 +89,7 @@ export default function PantryTab({
                     <div className="meal-macros">{r.calories} kcal · {r.type} · tap to log</div>
                   </div>
                   <button className="secondary" style={{ marginRight: 8 }} onClick={() => setBuilderTarget(r)}>Edit</button>
-                  <button className="remove-btn" onClick={() => onDeleteRecipe(r.id)}>×</button>
+                  <button className="remove-btn" aria-label={`Delete ${r.name}`} onClick={() => { if (confirm(`Delete "${r.name}"? This can't be undone.`)) onDeleteRecipe(r.id) }}>×</button>
                 </div>
               ))}
             </div>

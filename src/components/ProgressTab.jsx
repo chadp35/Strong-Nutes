@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { exportBodyMetricsCSV } from '../lib/exportData.js'
 import { fetchComments, fetchReactions, postComment } from '../lib/coaching.js'
+import { localDateKey as todayKey } from '../lib/dateKey.js'
 
 const MEASUREMENT_FIELDS = [
   { key: 'waist', label: 'Waist (in)' },
@@ -9,10 +10,6 @@ const MEASUREMENT_FIELDS = [
   { key: 'bust', label: 'Bust (in)' },
   { key: 'hips', label: 'Hips (in)' },
 ]
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function daysSince(dateStr) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
@@ -25,6 +22,8 @@ export default function ProgressTab({ bodyMetrics, onAddEntry, onDeleteEntry, my
   const [comments, setComments] = useState([])
   const [reactions, setReactions] = useState([])
   const [replyDrafts, setReplyDrafts] = useState({})
+  const [replyErrors, setReplyErrors] = useState({})
+  const [sendingReply, setSendingReply] = useState({})
 
   useEffect(() => {
     if (!myUserId || !hasCoach) return
@@ -35,7 +34,14 @@ export default function ProgressTab({ bodyMetrics, onAddEntry, onDeleteEntry, my
   async function sendReply(entryId) {
     const message = (replyDrafts[entryId] || '').trim()
     if (!message || !myUserId) return
-    await postComment({ clientId: myUserId, authorId: myUserId, message, targetType: 'body_metric', targetId: entryId })
+    setSendingReply(s => ({ ...s, [entryId]: true }))
+    setReplyErrors(er => ({ ...er, [entryId]: false }))
+    const ok = await postComment({ clientId: myUserId, authorId: myUserId, message, targetType: 'body_metric', targetId: entryId })
+    setSendingReply(s => ({ ...s, [entryId]: false }))
+    if (!ok) {
+      setReplyErrors(er => ({ ...er, [entryId]: true }))
+      return
+    }
     setComments(await fetchComments(myUserId))
     setReplyDrafts(d => ({ ...d, [entryId]: '' }))
   }
@@ -50,6 +56,11 @@ export default function ProgressTab({ bodyMetrics, onAddEntry, onDeleteEntry, my
 
   function submit() {
     if (!form.weightLbs && !form.waist && !form.quads && !form.calves && !form.bust && !form.hips) return
+    const fields = [form.weightLbs, form.waist, form.quads, form.calves, form.bust, form.hips]
+    if (fields.some(v => v !== '' && (Number(v) <= 0 || Number.isNaN(Number(v))))) {
+      alert('Measurements need to be a positive number.')
+      return
+    }
     const entry = {
       id: Date.now().toString(),
       date: todayKey(),
@@ -160,7 +171,7 @@ export default function ProgressTab({ bodyMetrics, onAddEntry, onDeleteEntry, my
                   </div>
                   {e.notes && <div className="muted small" style={{ marginTop: 2 }}>{e.notes}</div>}
                 </div>
-                <button className="remove-btn" onClick={() => onDeleteEntry(e.id)}>×</button>
+                <button className="remove-btn" aria-label="Delete entry" onClick={() => { if (confirm('Delete this check-in? This can\'t be undone.')) onDeleteEntry(e.id) }}>×</button>
               </div>
 
               {entryComments.length > 0 && (
@@ -174,14 +185,24 @@ export default function ProgressTab({ bodyMetrics, onAddEntry, onDeleteEntry, my
               )}
 
               {hasCoach && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  <input
-                    value={replyDrafts[e.id] || ''}
-                    onChange={ev => setReplyDrafts(d => ({ ...d, [e.id]: ev.target.value }))}
-                    placeholder="Reply to your coach…"
-                    style={{ flex: 1 }}
-                  />
-                  <button className="secondary" onClick={() => sendReply(e.id)}>Send</button>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      value={replyDrafts[e.id] || ''}
+                      onChange={ev => setReplyDrafts(d => ({ ...d, [e.id]: ev.target.value }))}
+                      placeholder="Reply to your coach…"
+                      style={{ flex: 1 }}
+                      disabled={!!sendingReply[e.id]}
+                    />
+                    <button className="secondary" disabled={!!sendingReply[e.id] || !(replyDrafts[e.id] || '').trim()} onClick={() => sendReply(e.id)}>
+                      {sendingReply[e.id] ? '…' : 'Send'}
+                    </button>
+                  </div>
+                  {replyErrors[e.id] && (
+                    <p className="small" style={{ color: 'var(--danger)', marginTop: 4, marginBottom: 0 }}>
+                      Couldn't send — check your connection and try again.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

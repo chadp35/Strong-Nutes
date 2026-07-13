@@ -3,6 +3,7 @@ import { SIDES } from '../data/sides.js'
 import { filterExcludedItems } from '../data/allergens.js'
 import { INGREDIENTS } from '../data/ingredients.js'
 import { WEIGHT_UNITS_TO_GRAMS, findIngredient, nutritionForLine } from './recipeBuilder.js'
+import { localDateKey } from './dateKey.js'
 
 // ---------- Plan dates ----------
 // A plan's "Day 1" is whatever calendar date the person actually starts it
@@ -240,7 +241,7 @@ function buildDayFromBaseMeals(dayNumber, coreMeals, { targets, personSettings =
 export function generatePlan({ targets, personSettings = {}, days = 7, startDate }) {
   const plan = []
   const recentIds = []
-  const base = startDate || new Date().toISOString().slice(0, 10)
+  const base = startDate || localDateKey()
 
   for (let d = 0; d < days; d++) {
     const breakfast = pickMeal('breakfast', personSettings, recentIds)

@@ -90,6 +90,11 @@ export default function GoalPlanner({ weightLbs, weightKg, bmr, tdee, activePlan
           onChange={e => { setTargetChangeLbs(e.target.value); setSelectedTier(null) }}
           placeholder="10"
         />
+        {targetChangeLbs !== '' && changeLbs <= 0 && (
+          <p className="small" style={{ color: 'var(--danger)', marginTop: 6, marginBottom: 0 }}>
+            Enter a number greater than 0.
+          </p>
+        )}
       </div>
 
       {tiers.length > 0 && (
