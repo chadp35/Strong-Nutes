@@ -1,37 +1,35 @@
-import React, { Suspense, useState, lazy } from 'react'
-import { suggestSides } from '../lib/mealPlanner.js'
+import React, { useState } from 'react'
+import { suggestSides, scaleItemToGrams } from '../lib/mealPlanner.js'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
+import { searchLocalProducts } from '../lib/localProductSearch.js'
+import BarcodeScanner from './BarcodeScanner.jsx'
 
-const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'))
+const TABS = [
+  { key: 'suggested', label: 'Suggested' },
+  { key: 'recipes', label: 'My Recipes' },
+  { key: 'search', label: 'Search' },
+]
 
-export default function AddExtraPanel({ remainingCalories, remainingProtein, personSettings, excludeIds, onPick }) {
+export default function AddExtraPanel({ remainingCalories, remainingProtein, personSettings, excludeIds, customRecipes, discoveredProducts, onRecordDiscovered, onPick }) {
   const [tab, setTab] = useState('suggested')
 
   return (
     <div className="card" style={{ background: 'var(--surface-2)', marginTop: 10 }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <button
-          className="secondary"
-          style={{
-            flex: 1, fontWeight: 700,
-            background: tab === 'suggested' ? 'var(--fuel)' : 'var(--surface)',
-            color: tab === 'suggested' ? '#12140f' : 'var(--text)',
-          }}
-          onClick={() => setTab('suggested')}
-        >
-          Suggested
-        </button>
-        <button
-          className="secondary"
-          style={{
-            flex: 1, fontWeight: 700,
-            background: tab === 'web' ? 'var(--fuel)' : 'var(--surface)',
-            color: tab === 'web' ? '#12140f' : 'var(--text)',
-          }}
-          onClick={() => setTab('web')}
-        >
-          Search the web
-        </button>
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            className="secondary"
+            style={{
+              flex: 1, fontWeight: 700, fontSize: 13,
+              background: tab === t.key ? 'var(--fuel)' : 'var(--surface)',
+              color: tab === t.key ? '#12140f' : 'var(--text)',
+            }}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === 'suggested' && (
@@ -43,7 +41,12 @@ export default function AddExtraPanel({ remainingCalories, remainingProtein, per
           onPick={(item) => onPick(item, 'side')}
         />
       )}
-      {tab === 'web' && <WebSearch onPick={(item) => onPick(item, 'side')} />}
+      {tab === 'recipes' && (
+        <MyRecipesPicker customRecipes={customRecipes} onPick={(item) => onPick(item, 'meal')} />
+      )}
+      {tab === 'search' && (
+        <WebAndLocalSearch discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} onPick={(item) => onPick(item, 'side')} />
+      )}
     </div>
   )
 }
@@ -52,7 +55,7 @@ function SuggestedList({ remainingCalories, remainingProtein, personSettings, ex
   const sides = suggestSides({ remainingCalories, remainingProtein, personSettings, excludeIds })
 
   if (sides.length === 0) {
-    return <p className="muted small">No local suggestions fit right now — try the web search tab.</p>
+    return <p className="muted small">No local suggestions fit right now — try the Search tab.</p>
   }
 
   return (
@@ -70,21 +73,71 @@ function SuggestedList({ remainingCalories, remainingProtein, personSettings, ex
   )
 }
 
-function WebSearch({ onPick }) {
+// Lets you add one of your own saved recipes to this day, with the
+// recommended serving size shown in grams and a direct gram adjuster —
+// scale it up or down to exactly what you're actually eating, not just
+// whole servings.
+function MyRecipesPicker({ customRecipes, onPick }) {
+  const [selected, setSelected] = useState(null)
+  const [grams, setGrams] = useState(0)
+
+  if (!customRecipes || customRecipes.length === 0) {
+    return <p className="muted small">No saved recipes yet. Build one from the Pantry tab's "My Recipe" mode.</p>
+  }
+
+  if (selected) {
+    const scaled = scaleItemToGrams(selected, grams)
+    return (
+      <div>
+        <p className="meal-name" style={{ marginBottom: 2 }}>{selected.name}</p>
+        <p className="muted small" style={{ marginBottom: 10 }}>Recommended: {selected.servingWeightG}g per serving</p>
+        <div className="field">
+          <label>Amount (grams)</label>
+          <input type="number" value={grams} onChange={e => setGrams(Math.max(0, Number(e.target.value) || 0))} />
+        </div>
+        <p className="mono small" style={{ marginBottom: 12 }}>
+          {scaled.calories} kcal · P{scaled.protein}g · C{scaled.carbs}g · F{scaled.fat}g
+        </p>
+        <button className="primary" style={{ marginBottom: 8 }} onClick={() => onPick(scaled)}>Add this</button>
+        <button className="secondary" style={{ width: '100%' }} onClick={() => setSelected(null)}>Back</button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {customRecipes.map(r => (
+        <div className="meal-row" key={r.id} style={{ cursor: 'pointer' }} onClick={() => { setSelected(r); setGrams(r.servingWeightG || 100) }}>
+          <div>
+            <div className="meal-name">{r.name}</div>
+            <div className="meal-type">{r.type} · ≈{r.servingWeightG}g/serving</div>
+          </div>
+          <span className="meal-macros">{r.calories} kcal</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WebAndLocalSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [webResults, setWebResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [grams, setGrams] = useState(100)
   const [scanning, setScanning] = useState(false)
+  const [searchedWeb, setSearchedWeb] = useState(false)
 
-  async function search() {
+  const localResults = searchLocalProducts(query, discoveredProducts)
+
+  async function searchWeb() {
     if (query.trim().length < 2) return
     setLoading(true)
     setError('')
+    setSearchedWeb(true)
     try {
-      setResults(await searchBrandedFoods(query))
+      setWebResults(await searchBrandedFoods(query))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -112,11 +165,7 @@ function WebSearch({ onPick }) {
   }
 
   if (scanning) {
-    return (
-      <Suspense fallback={<p className="muted small">Loading scanner…</p>}>
-        <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
-      </Suspense>
-    )
+    return <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
   }
 
   if (selected) {
@@ -134,13 +183,16 @@ function WebSearch({ onPick }) {
         </p>
         <button
           className="primary"
-          onClick={() => onPick({
-            id: `web-${selected.id}-${Date.now()}`,
-            name: selected.brand ? `${selected.name} (${selected.brand})` : selected.name,
-            ...macros,
-            recipe: 'Added from a web search — check the label for the exact serving.',
-            ingredients: [],
-          })}
+          onClick={() => {
+            onRecordDiscovered?.(selected)
+            onPick({
+              id: `web-${selected.id}-${Date.now()}`,
+              name: selected.brand ? `${selected.name} (${selected.brand})` : selected.name,
+              ...macros,
+              recipe: 'Added from search — check the label for the exact serving.',
+              ingredients: [],
+            })
+          }}
         >
           Add this
         </button>
@@ -150,25 +202,48 @@ function WebSearch({ onPick }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. granola bar" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && search()} />
-        <button className="secondary" onClick={search}>Search</button>
-        <button className="secondary" onClick={() => setScanning(true)}>📷</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. Great Value peanut butter" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && searchWeb()} />
       </div>
-      {loading && <p className="muted small">{query ? 'Searching…' : 'Looking up barcode…'}</p>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button className="secondary" style={{ flex: 1 }} onClick={() => setScanning(true)}>📷 Scan barcode</button>
+        <button className="secondary" style={{ flex: 1 }} onClick={searchWeb} disabled={loading}>🌐 Search web</button>
+      </div>
+
+      {localResults.length > 0 && (
+        <>
+          <p className="muted small" style={{ marginBottom: 6 }}>Instant matches</p>
+          {localResults.map(food => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
+              <div>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-type">{food.brand || 'Branded food'}</div>
+              </div>
+              <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {loading && <p className="muted small">{query.trim() ? 'Searching…' : 'Looking up barcode…'}</p>}
       {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
-      {results.map(food => (
-        <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
-          <div>
-            <div className="meal-name">{food.name}</div>
-            <div className="meal-type">{food.brand || 'Branded food'}</div>
-          </div>
-          <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
-        </div>
-      ))}
-      <p className="muted small" style={{ marginTop: 10 }}>
-        Via Open Food Facts — useful when the local list is a little short on options. Always worth a quick label check.
-      </p>
+      {searchedWeb && !loading && webResults.length === 0 && (
+        <p className="muted small">No web matches. Try a shorter or more generic term.</p>
+      )}
+      {webResults.length > 0 && (
+        <>
+          <p className="muted small" style={{ marginTop: localResults.length > 0 ? 10 : 0, marginBottom: 6 }}>From the web</p>
+          {webResults.map(food => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
+              <div>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-type">{food.brand || 'Branded food'}</div>
+              </div>
+              <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   )
 }

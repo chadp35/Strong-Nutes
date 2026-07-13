@@ -300,6 +300,26 @@ export function totalBatchWeight(meal, servings) {
   return Math.round((meal.servingWeightG || 0) * servings)
 }
 
+// Scales a saved recipe (or any meal-shaped item) to a specific gram amount
+// rather than a whole number of servings — the flexible, RP-Strength-style
+// "just tell me the grams" adjustment. Macros AND ingredients scale together
+// so the shopping list and bulk-prep stay accurate at whatever amount is
+// actually being added.
+export function scaleItemToGrams(item, grams) {
+  const baseWeight = item.servingWeightG || grams
+  const factor = baseWeight > 0 ? grams / baseWeight : 1
+  return {
+    ...item,
+    id: `${item.id}-${Date.now()}`,
+    calories: Math.round(item.calories * factor),
+    protein: Math.round(item.protein * factor * 10) / 10,
+    carbs: Math.round(item.carbs * factor * 10) / 10,
+    fat: Math.round(item.fat * factor * 10) / 10,
+    servingWeightG: Math.round(grams),
+    ingredients: (item.ingredients || []).map(ing => ({ ...ing, qty: Math.round(ing.qty * factor * 100) / 100 })),
+  }
+}
+
 // ---------- Pantry matching ----------
 
 function normalize(s) {

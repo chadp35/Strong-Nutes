@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import {
   searchIngredients, availableUnitsFor, calculateRecipeTotals,
   applyDrainedFat, suggestServings, computePerServing, ingredientFromOFF,
 } from '../lib/recipeBuilder.js'
-import { searchBrandedFoods } from '../lib/openFoodFacts.js'
+import { searchBrandedFoods, getProductByBarcode } from '../lib/openFoodFacts.js'
+import { searchLocalProducts } from '../lib/localProductSearch.js'
 import { conflictsWithAllergies, ALLERGEN_OPTIONS } from '../data/allergens.js'
 import { ALL_TAGS } from '../data/foods.js'
+import BarcodeScanner from './BarcodeScanner.jsx'
 
 const MEAL_TYPES = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -14,20 +16,26 @@ const MEAL_TYPES = [
   { key: 'snack', label: 'Snack' },
 ]
 
-export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
-  const [name, setName] = useState('')
-  const [lines, setLines] = useState([]) // { ingredient, qty, unit, isWrapper }
+export default function RecipeBuilder({ allergies, discoveredProducts, onRecordDiscovered, onSaveRecipe, onDone, existingRecipe }) {
+  const editing = !!existingRecipe
+  const saved = existingRecipe?.builderState
+
+  const [name, setName] = useState(existingRecipe?.name || '')
+  const [lines, setLines] = useState(saved?.lines || []) // { ingredient, qty, unit, isWrapper }
   const [query, setQuery] = useState('')
   const [webResults, setWebResults] = useState([])
   const [searching, setSearching] = useState(false)
-  const [drainedFatTbsp, setDrainedFatTbsp] = useState('')
-  const [actualWeight, setActualWeight] = useState('')
-  const [servings, setServings] = useState(null) // null until first computed
-  const [mealType, setMealType] = useState('dinner')
-  const [selectedTags, setSelectedTags] = useState([])
-  const [notes, setNotes] = useState('')
+  const [searchedWeb, setSearchedWeb] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [drainedFatTbsp, setDrainedFatTbsp] = useState(saved?.drainedFatTbsp ? String(saved.drainedFatTbsp) : '')
+  const [actualWeight, setActualWeight] = useState(saved?.actualWeight ? String(saved.actualWeight) : '')
+  const [servings, setServings] = useState(saved?.servings || null)
+  const [mealType, setMealType] = useState(existingRecipe?.type || 'dinner')
+  const [selectedTags, setSelectedTags] = useState(existingRecipe?.tags || [])
+  const [notes, setNotes] = useState(existingRecipe?.recipe && existingRecipe.recipe !== 'Custom recipe you created.' ? existingRecipe.recipe : '')
 
-  const localResults = useMemo(() => searchIngredients(query), [query])
+  const localIngredientResults = searchIngredients(query)
+  const localProductResults = searchLocalProducts(query, discoveredProducts)
 
   const { totals: rawTotals } = calculateRecipeTotals(lines)
   const adjustedTotals = applyDrainedFat(rawTotals, Number(drainedFatTbsp) || 0)
@@ -41,15 +49,34 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
     setLines(ls => [...ls, { ingredient, qty: 1, unit: units[0], isWrapper: false }])
     setQuery('')
     setWebResults([])
+    setSearchedWeb(false)
+  }
+
+  function addProductAsIngredient(product) {
+    onRecordDiscovered?.(product)
+    addLine(ingredientFromOFF(product))
   }
 
   async function searchWeb() {
     if (query.trim().length < 2) return
     setSearching(true)
+    setSearchedWeb(true)
     try {
-      const results = await searchBrandedFoods(query)
-      setWebResults(results)
+      setWebResults(await searchBrandedFoods(query))
     } catch {
+      setWebResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  async function handleBarcodeDetected(code) {
+    setScanning(false)
+    setSearching(true)
+    try {
+      const product = await getProductByBarcode(code)
+      addProductAsIngredient(product)
+    } catch (err) {
       setWebResults([])
     } finally {
       setSearching(false)
@@ -79,7 +106,7 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
     }))
 
     onSaveRecipe({
-      id: `recipe-${Date.now()}`,
+      id: existingRecipe?.id || `recipe-${Date.now()}`,
       name: name.trim(),
       type: mealType,
       tags: selectedTags,
@@ -91,16 +118,29 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
       ingredients: perServingIngredients,
       recipe: notes.trim() || 'Custom recipe you created.',
       isCustomRecipe: true,
+      // Kept so this recipe can be reopened and edited later — the rest of
+      // the app only ever reads the fields above, this is purely for the
+      // builder itself to rehydrate from.
+      builderState: {
+        lines,
+        drainedFatTbsp: Number(drainedFatTbsp) || 0,
+        actualWeight: Number(actualWeight) || 0,
+        servings: s,
+      },
     })
     onDone?.()
+  }
+
+  if (scanning) {
+    return <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
   }
 
   return (
     <div>
       <p className="muted small" style={{ marginBottom: 16 }}>
-        Enter what actually goes into the dish and I'll calculate the nutrition —
-        including handling for drained fat and real cooked weight, so bulk-cooked
-        dishes portion accurately.
+        {editing
+          ? 'Editing this recipe — adjust ingredients, servings, or portioning and save.'
+          : "Enter what actually goes into the dish and I'll calculate the nutrition — including handling for drained fat and real cooked weight, so bulk-cooked dishes portion accurately."}
       </p>
 
       <div className="field">
@@ -110,17 +150,23 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
 
       <div className="card" style={{ background: 'var(--surface-2)' }}>
         <h2>Ingredients</h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div className="field">
           <input
             value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Search ingredients, e.g. chicken breast"
-            style={{ flex: 1 }}
+            placeholder="Search ingredients, e.g. chicken breast or Great Value rice"
           />
         </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <button className="secondary" style={{ flex: 1 }} onClick={() => setScanning(true)}>📷 Scan barcode</button>
+          <button className="secondary" style={{ flex: 1 }} onClick={searchWeb} disabled={searching}>
+            {searching ? '…' : '🌐 Search web'}
+          </button>
+        </div>
 
-        {localResults.length > 0 && (
+        {localIngredientResults.length > 0 && (
           <div style={{ marginBottom: 10 }}>
-            {localResults.map(ing => (
+            <p className="muted small" style={{ marginBottom: 6 }}>Raw ingredients</p>
+            {localIngredientResults.map(ing => (
               <div className="meal-row" style={{ cursor: 'pointer' }} key={ing.id} onClick={() => addLine(ing)}>
                 <div className="meal-name">{ing.name}</div>
                 <span className="meal-macros">{ing.per100g.calories} kcal/100g</span>
@@ -129,16 +175,31 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
           </div>
         )}
 
-        {localResults.length === 0 && query.trim().length >= 2 && (
+        {localProductResults.length > 0 && (
           <div style={{ marginBottom: 10 }}>
-            <p className="muted small" style={{ marginBottom: 8 }}>Not in the local list.</p>
-            <button className="secondary" onClick={searchWeb} disabled={searching}>
-              {searching ? 'Searching…' : 'Search the web instead'}
-            </button>
+            <p className="muted small" style={{ marginBottom: 6 }}>Branded products</p>
+            {localProductResults.map(p => (
+              <div className="meal-row" style={{ cursor: 'pointer' }} key={p.id} onClick={() => addProductAsIngredient(p)}>
+                <div>
+                  <div className="meal-name">{p.name}</div>
+                  <div className="meal-type">{p.brand}</div>
+                </div>
+                <span className="meal-macros">{p.caloriesPer100g} kcal/100g</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {searchedWeb && !searching && webResults.length === 0 && (
+          <p className="muted small" style={{ marginBottom: 10 }}>No web matches. Try a shorter or more generic term.</p>
+        )}
+        {webResults.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <p className="muted small" style={{ marginBottom: 6 }}>From the web</p>
             {webResults.map(food => (
               <div
                 className="meal-row" style={{ cursor: 'pointer' }} key={food.id}
-                onClick={() => addLine(ingredientFromOFF(food))}
+                onClick={() => addProductAsIngredient(food)}
               >
                 <div>
                   <div className="meal-name">{food.name}</div>
@@ -275,9 +336,12 @@ export default function RecipeBuilder({ allergies, onSaveRecipe, onDone }) {
             </div>
           </div>
 
-          <button className="primary" disabled={!name.trim()} style={{ opacity: name.trim() ? 1 : 0.5 }} onClick={save}>
-            Save to my recipes
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="primary" style={{ flex: 1, opacity: name.trim() ? 1 : 0.5 }} disabled={!name.trim()} onClick={save}>
+              {editing ? 'Save changes' : 'Save to my recipes'}
+            </button>
+            {editing && <button className="secondary" onClick={onDone}>Cancel</button>}
+          </div>
         </>
       )}
     </div>

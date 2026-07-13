@@ -30,7 +30,7 @@ export default function SettingsTab({
   profile, userEmail, onEdit, onReset, onSignOut,
   onStartGoalPlan, onStopGoalPlan, fullState,
   onSelectCoach, onUpdateSafetyProfile,
-  customRecipes, onDeleteRecipe,
+  customRecipes, onDeleteRecipe, onEditRecipe,
 }) {
   const weightLbs = kgToLbs(profile.weightKg)
   const [coaches, setCoaches] = useState([])
@@ -199,6 +199,7 @@ export default function SettingsTab({
                 <div className="meal-name">{r.name}</div>
                 <div className="meal-macros">{r.calories} kcal · {r.type}</div>
               </div>
+              <button className="secondary" style={{ marginRight: 8 }} onClick={() => onEditRecipe(r)}>Edit</button>
               <button className="remove-btn" onClick={() => onDeleteRecipe(r.id)}>×</button>
             </div>
           ))}

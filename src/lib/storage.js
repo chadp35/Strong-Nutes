@@ -10,7 +10,8 @@ export const defaultState = {
   customFoods: [],        // [{ id, name, brand, calories, protein, carbs, fat, servingLabel }]
   bodyMetrics: [],         // [{ id, date, weightLbs, waist, quads, calves, bust, hips, notes }]
   water: {},                // { 'YYYY-MM-DD': cupsCount }
-  customRecipes: [],         // [{ id, name, type, tags, calories, protein, carbs, fat, servingWeightG, ingredients, recipe, isCustomRecipe }]
+  customRecipes: [],         // [{ id, name, type, tags, calories, protein, carbs, fat, servingWeightG, ingredients, recipe, isCustomRecipe, builderState }]
+  discoveredProducts: [],     // [{ id, name, brand, caloriesPer100g, proteinPer100g, carbsPer100g, fatPer100g, servingGrams, servingLabel }] — grows every time a barcode scan or web search result actually gets used
 }
 
 function normalizeRow(data) {
@@ -24,6 +25,7 @@ function normalizeRow(data) {
     bodyMetrics: data.body_metrics ?? [],
     water: data.water ?? {},
     customRecipes: data.custom_recipes ?? [],
+    discoveredProducts: data.discovered_products ?? [],
   }
 }
 
@@ -75,6 +77,7 @@ async function attemptSave(userId, state, userEmail) {
     body_metrics: state.bodyMetrics,
     water: state.water,
     custom_recipes: state.customRecipes,
+    discovered_products: state.discoveredProducts,
     contact_email: userEmail,
   })
   if (error) throw error

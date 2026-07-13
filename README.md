@@ -39,20 +39,57 @@ connection drops or hiccups.**
 
 ## Barcode scanning
 Uses `@zxing/browser` (camera-based, works on iOS and Android browsers) plus
-Open Food Facts' barcode lookup endpoint — same free API as the text search,
-just by UPC/EAN code instead of a search term. Available from the "Scan"
-button next to food search on the Today tab, and inside "+ Add a meal or
-side" on the Plan tab. If the camera can't be accessed (permission denied, no
-camera, unsupported browser), it falls back to typing the barcode number by
-hand instead of being a dead end. The scanning library is lazy-loaded — it
-only downloads (~450KB) when someone actually taps Scan, so it doesn't slow
-down the app for everyone else.
+Open Food Facts' barcode lookup endpoint. Available from a dedicated "📷 Scan
+barcode" button — not tucked behind a search flow — in three places: food
+logging (Today tab), "+ Add a meal or side" (Plan tab), and ingredient search
+inside the recipe builder (Pantry tab). If the camera can't be accessed
+(permission denied, no camera, unsupported browser), it falls back to typing
+the barcode number by hand instead of being a dead end.
+
+**No longer lazy-loaded.** It was originally split into its own chunk to keep
+the initial bundle small, but that introduced a multi-second "is this
+broken?" delay the first time someone tapped Scan in a session — real,
+direct feedback that the delay wasn't worth the bundle-size savings. It's
+back in the main bundle now, so tapping Scan is instant. The honest tradeoff:
+initial page load is a bit heavier (~250KB gzipped) in exchange for the
+in-app experience never feeling like it's hanging.
 
 **One honest caveat**: the exact library API was verified against its shipped
 TypeScript definitions before writing this, so the code matches what the
 library actually exposes — but a live camera stream can't be tested from this
 sandboxed environment. Worth a real test on your phone as the first thing to
 check after deploying.
+
+## Faster, bigger local food database
+Two things work together to cut down how often you need the (slower) web
+search or barcode path at all:
+- **`src/data/commonBrands.js`** — ~50 everyday branded products (Great
+  Value's store brand covers most grocery categories, plus a handful of other
+  near-universal staples like Chobani, Jif, Barilla) searchable instantly,
+  with zero network call.
+- **Your own "discovered products" cache** — every time a barcode scan or web
+  search result actually gets used (added to a log, a recipe, or a plan day),
+  it's saved to your personal product list (`discoveredProducts`, synced via
+  Supabase). Scan something once, and it's an instant local match every time
+  after that — the database genuinely grows the more you use it.
+
+Local results always show first and instantly as you type; web search is a
+deliberate button press rather than something that auto-fires on every
+keystroke, so the network is only ever in the critical path when you actually
+need it.
+
+## Recipes: editable, and flexible in the Plan tab
+- **Editing** — every saved recipe keeps its full builder state (ingredients,
+  drained-fat amount, weighed total, servings) attached, so reopening it for
+  editing rehydrates exactly what you had, not just the final numbers. Edit
+  from the Pantry tab's "My Recipe" mode (recipe list at the top) or from
+  Settings.
+- **Gram-flexible in the Plan tab** — "+ Add a meal or side" has a "My
+  Recipes" tab: pick a recipe, see its recommended serving size in grams, and
+  adjust it up or down directly — macros and the shopping-list ingredients
+  scale together with it. This is the RP Strength-style flexibility that was
+  missing: not just "add 1 serving," but "add exactly how much I'm actually
+  eating."
 
 *No Supabase schema changes for this update* — internet failover, barcode
 scanning, and bulk-prep are all client-side. If you're already on the
@@ -80,6 +117,9 @@ data. The many new profile fields (allergies, dietary framework, food
 preferences, lifestyle answers, etc.) don't need a schema change at all —
 `profile` is already a flexible jsonb column, so new fields just start
 appearing in it the moment someone fills out the new onboarding steps.
+
+**Latest update** adds `discovered_products` (the personal product cache) —
+same deal, re-run `supabase/schema.sql` once more, safe on existing data.
 
 ## Custom recipes & the ingredient nutrition engine
 The Pantry tab's "My Recipe" mode lets you build a recipe from real
@@ -239,8 +279,9 @@ src/
   lib/
     supabaseClient.js  Supabase client init
     calculations.js    BMR/TDEE/macro target math, timed goal-plan math, eating-style macro splits
-    mealPlanner.js      plan generation (real meals + sides, no scaling), shopping list, pantry matching, per-slot regenerate/swap — all safety-filtered via personSettings
+    mealPlanner.js      plan generation (real meals + sides, no scaling), shopping list, pantry matching, per-slot regenerate/swap, gram-based recipe scaling — all safety-filtered via personSettings
     recipeBuilder.js      unit conversion, ingredient nutrition totaling, cooking-loss math, serving suggestions
+    localProductSearch.js  instant local search combining commonBrands + a user's discovered-products cache
     storage.js          load/save with retry + local-cache/pending-save failover
     localCache.js         localStorage read-cache and pending-save queue
     useOnlineStatus.js     online/offline detection hook
@@ -252,6 +293,7 @@ src/
     sides.js             small grazing-style gap-filler items
     storeSnacks.js        On the Go chain-level reference database
     ingredients.js         raw ingredient nutrition database for the recipe builder (~90 foods)
+    commonBrands.js         everyday branded products (Great Value + other staples) for instant search
     allergens.js            allergen/dietary-framework keyword detection — the hard-exclusion safety layer
   components/
     AuthScreen.jsx       sign in / sign up
@@ -260,15 +302,15 @@ src/
     Dashboard.jsx
     AddFoodPanel.jsx     branded search / barcode / My Foods (+ My Recipes) / manual entry
     MealPlanTab.jsx
-    AddExtraPanel.jsx     add a meal/side to a day (suggested, web search, or barcode)
+    AddExtraPanel.jsx     add a meal/side to a day — Suggested / My Recipes (gram-adjustable) / Search (local-first + barcode)
     BulkPrepControls.jsx   batch-scale ingredients + real-weight portioning, wrapper-aware
-    BarcodeScanner.jsx     camera scan with manual-entry fallback (lazy-loaded)
-    RecipeBuilder.jsx      custom recipe nutrition calculator (lazy-loaded)
-    PantryTab.jsx          My Pantry + On the Go + My Recipe modes
+    BarcodeScanner.jsx     camera scan with manual-entry fallback (bundled directly, not lazy — see Barcode scanning above)
+    RecipeBuilder.jsx      custom recipe nutrition calculator, edit-aware (lazy-loaded — a bigger, less-frequent surface than scanning)
+    PantryTab.jsx          My Pantry + On the Go + My Recipe modes (recipe list with edit/delete, cross-tab edit from Settings)
     ProgressTab.jsx        body composition tracking
     ShoppingListTab.jsx
-    SettingsTab.jsx        includes safety-profile quick-edit (allergies/dietary framework) and recipe management
-    CoachDashboard.jsx     coach-facing client list, now surfacing allergies/diet/non-negotiable
+    SettingsTab.jsx        safety-profile quick-edit (allergies/dietary framework), recipe management with edit
+    CoachDashboard.jsx     coach-facing client list, surfacing allergies/diet/non-negotiable
     Gauge.jsx
-  App.jsx                auth + data sync + tab routing + personSettings assembly
+  App.jsx                auth + data sync + tab routing + personSettings assembly + discovered-product recording
 ```

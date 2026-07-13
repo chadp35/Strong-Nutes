@@ -21,6 +21,7 @@ export default function App() {
   const [state, setState] = useState(defaultState)
   const [stateLoading, setStateLoading] = useState(true)
   const [tab, setTab] = useState('dashboard')
+  const [recipeToEdit, setRecipeToEdit] = useState(null)
   const [isCoach, setIsCoach] = useState(false)
   const [dataSource, setDataSource] = useState('server') // 'server' | 'pending' | 'cache' | 'default'
   const [synced, setSynced] = useState(true)
@@ -187,11 +188,32 @@ export default function App() {
   }
 
   function handleSaveRecipe(recipe) {
-    setState(s => ({ ...s, customRecipes: [recipe, ...s.customRecipes] }))
+    setState(s => {
+      const exists = s.customRecipes.some(r => r.id === recipe.id)
+      const customRecipes = exists
+        ? s.customRecipes.map(r => (r.id === recipe.id ? recipe : r))
+        : [recipe, ...s.customRecipes]
+      return { ...s, customRecipes }
+    })
   }
 
   function handleDeleteRecipe(id) {
     setState(s => ({ ...s, customRecipes: s.customRecipes.filter(r => r.id !== id) }))
+  }
+
+  function handleEditRecipe(recipe) {
+    setRecipeToEdit(recipe)
+    setTab('pantry')
+  }
+
+  // Grows the person's personal product cache every time a barcode scan or
+  // web search result actually gets used, so future lookups for the same
+  // item resolve instantly and locally instead of hitting the network again.
+  function handleRecordDiscoveredProduct(product) {
+    setState(s => {
+      if (s.discoveredProducts.some(p => p.id === product.id)) return s
+      return { ...s, discoveredProducts: [product, ...s.discoveredProducts].slice(0, 300) }
+    })
   }
 
   function handleSavePantry(items) {
@@ -356,6 +378,8 @@ export default function App() {
           todaysWater={state.water[todayKey()] || 0}
           onChangeWater={handleChangeWater}
           customRecipes={state.customRecipes}
+          discoveredProducts={state.discoveredProducts}
+          onRecordDiscovered={handleRecordDiscoveredProduct}
         />
       )}
       {tab === 'plan' && (
@@ -369,6 +393,9 @@ export default function App() {
           targets={state.profile.targets}
           savedPantry={state.pantry}
           personSettings={personSettings}
+          customRecipes={state.customRecipes}
+          discoveredProducts={state.discoveredProducts}
+          onRecordDiscovered={handleRecordDiscoveredProduct}
         />
       )}
       {tab === 'pantry' && (
@@ -379,7 +406,13 @@ export default function App() {
           remainingTargets={remainingTargets}
           allergies={state.profile.allergies || []}
           onSaveRecipe={handleSaveRecipe}
+          onDeleteRecipe={handleDeleteRecipe}
           personSettings={personSettings}
+          customRecipes={state.customRecipes}
+          discoveredProducts={state.discoveredProducts}
+          onRecordDiscovered={handleRecordDiscoveredProduct}
+          recipeToEdit={recipeToEdit}
+          onClearRecipeToEdit={() => setRecipeToEdit(null)}
         />
       )}
       {tab === 'progress' && (
@@ -411,6 +444,7 @@ export default function App() {
           onUpdateSafetyProfile={handleUpdateSafetyProfile}
           customRecipes={state.customRecipes}
           onDeleteRecipe={handleDeleteRecipe}
+          onEditRecipe={handleEditRecipe}
         />
       )}
 

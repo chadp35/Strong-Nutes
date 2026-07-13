@@ -1,4 +1,4 @@
-import React, { Suspense, useState, lazy } from 'react'
+import React, { Suspense, useEffect, useState, lazy } from 'react'
 import { matchPantryToMeals, formatIngredient } from '../lib/mealPlanner.js'
 import { CHAINS, findStoreOptions } from '../data/storeSnacks.js'
 import BulkPrepControls from './BulkPrepControls.jsx'
@@ -19,8 +19,25 @@ const MODES = [
   { key: 'recipe', label: 'My Recipe' },
 ]
 
-export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remainingTargets, allergies, onSaveRecipe, personSettings }) {
+export default function PantryTab({
+  savedPantry, onSavePantry, onLogMeal, remainingTargets, allergies, onSaveRecipe, personSettings,
+  customRecipes, discoveredProducts, onRecordDiscovered, onDeleteRecipe, recipeToEdit, onClearRecipeToEdit,
+}) {
   const [mode, setMode] = useState('kitchen') // 'kitchen' | 'onthego' | 'recipe'
+  const [builderTarget, setBuilderTarget] = useState(null) // null = list, 'new' = blank builder, or a recipe object = edit
+
+  // Jumping here from Settings' "Edit" button on a recipe
+  useEffect(() => {
+    if (recipeToEdit) {
+      setMode('recipe')
+      setBuilderTarget(recipeToEdit)
+    }
+  }, [recipeToEdit])
+
+  function closeBuilder() {
+    setBuilderTarget(null)
+    onClearRecipeToEdit?.()
+  }
 
   return (
     <div className="app-shell" style={{ paddingTop: 20 }}>
@@ -35,7 +52,7 @@ export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remain
               color: mode === m.key ? '#12140f' : 'var(--text)',
               borderColor: mode === m.key ? 'var(--fuel)' : 'var(--border)',
             }}
-            onClick={() => setMode(m.key)}
+            onClick={() => { setMode(m.key); if (m.key !== 'recipe') closeBuilder() }}
           >
             {m.label}
           </button>
@@ -48,9 +65,36 @@ export default function PantryTab({ savedPantry, onSavePantry, onLogMeal, remain
       {mode === 'onthego' && (
         <OnTheGoMode onLogMeal={onLogMeal} remainingTargets={remainingTargets} personSettings={personSettings} />
       )}
-      {mode === 'recipe' && (
+      {mode === 'recipe' && !builderTarget && (
+        <div>
+          {customRecipes?.length > 0 && (
+            <div className="card">
+              <h2>Your recipes</h2>
+              {customRecipes.map(r => (
+                <div className="log-entry" key={r.id}>
+                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => onLogMeal(r)}>
+                    <div className="meal-name">{r.name}</div>
+                    <div className="meal-macros">{r.calories} kcal · {r.type} · tap to log</div>
+                  </div>
+                  <button className="secondary" style={{ marginRight: 8 }} onClick={() => setBuilderTarget(r)}>Edit</button>
+                  <button className="remove-btn" onClick={() => onDeleteRecipe(r.id)}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button className="primary" style={{ width: '100%' }} onClick={() => setBuilderTarget('new')}>+ New recipe</button>
+        </div>
+      )}
+      {mode === 'recipe' && builderTarget && (
         <Suspense fallback={<p className="muted small">Loading recipe builder…</p>}>
-          <RecipeBuilder allergies={allergies} onSaveRecipe={onSaveRecipe} onDone={() => setMode('kitchen')} />
+          <RecipeBuilder
+            allergies={allergies}
+            discoveredProducts={discoveredProducts}
+            onRecordDiscovered={onRecordDiscovered}
+            onSaveRecipe={(recipe) => { onSaveRecipe(recipe); closeBuilder() }}
+            onDone={closeBuilder}
+            existingRecipe={builderTarget === 'new' ? undefined : builderTarget}
+          />
         </Suspense>
       )}
     </div>

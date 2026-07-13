@@ -6,7 +6,7 @@ import {
 import AddExtraPanel from './AddExtraPanel.jsx'
 import BulkPrepControls from './BulkPrepControls.jsx'
 
-export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, targets, savedPantry, personSettings }) {
+export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, targets, savedPantry, personSettings, customRecipes, discoveredProducts, onRecordDiscovered }) {
   const [expanded, setExpanded] = useState(null)
   const [pantryModeKey, setPantryModeKey] = useState(null)
   const [addPanelDay, setAddPanelDay] = useState(null)
@@ -139,6 +139,9 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
                 remainingProtein={Math.max(targets.protein - day.totals.protein, 0)}
                 personSettings={personSettings}
                 excludeIds={day.meals.map(m => m.id)}
+                customRecipes={customRecipes}
+                discoveredProducts={discoveredProducts}
+                onRecordDiscovered={onRecordDiscovered}
                 onPick={(item, kind) => { onAddExtra(day.day, item, kind); setAddPanelDay(null) }}
               />
             )}

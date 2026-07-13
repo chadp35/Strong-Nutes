@@ -1,7 +1,7 @@
-import React, { Suspense, useEffect, useRef, useState, lazy } from 'react'
+import React, { useState } from 'react'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
-
-const BarcodeScanner = lazy(() => import('./BarcodeScanner.jsx'))
+import { searchLocalProducts } from '../lib/localProductSearch.js'
+import BarcodeScanner from './BarcodeScanner.jsx'
 
 const SUBTABS = [
   { key: 'search', label: 'Search' },
@@ -9,7 +9,7 @@ const SUBTABS = [
   { key: 'manual', label: 'Manual' },
 ]
 
-export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone }) {
+export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered }) {
   const [subtab, setSubtab] = useState('search')
 
   return (
@@ -34,7 +34,7 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
       </div>
 
       {subtab === 'search' && (
-        <BrandedSearch onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
+        <BrandedSearch onAddEntry={onAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} />
       )}
       {subtab === 'mine' && (
         <MyFoods customFoods={customFoods} customRecipes={customRecipes} onAddEntry={onAddEntry} onDeleteCustomFood={onDeleteCustomFood} onDone={onDone} />
@@ -48,36 +48,31 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
 
 // ---------- Branded search (Open Food Facts) ----------
 
-function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
+function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone, discoveredProducts, onRecordDiscovered }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [webResults, setWebResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [grams, setGrams] = useState(100)
   const [scanning, setScanning] = useState(false)
-  const debounceRef = useRef(null)
+  const [searchedWeb, setSearchedWeb] = useState(false)
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (query.trim().length < 2) {
-      setResults([])
-      return
+  const localResults = searchLocalProducts(query, discoveredProducts)
+
+  async function searchWeb() {
+    if (query.trim().length < 2) return
+    setLoading(true)
+    setError('')
+    setSearchedWeb(true)
+    try {
+      setWebResults(await searchBrandedFoods(query))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const r = await searchBrandedFoods(query)
-        setResults(r)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }, 450)
-    return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }
 
   function selectFood(food) {
     setSelected(food)
@@ -106,12 +101,13 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
       ...macros,
     }
     onAddEntry(entry)
+    onRecordDiscovered?.(selected)
     if (alsoSave) {
       onSaveCustomFood({ id: `custom-${Date.now()}`, name: entry.name, ...macros, servingLabel: `${grams}g` })
     }
     setSelected(null)
     setQuery('')
-    setResults([])
+    setWebResults([])
     onDone?.()
   }
 
@@ -139,43 +135,60 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone }) {
   }
 
   if (scanning) {
-    return (
-      <Suspense fallback={<p className="muted small">Loading scanner…</p>}>
-        <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
-      </Suspense>
-    )
+    return <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
   }
 
   return (
     <div>
       <div className="field">
-        <label>Search branded foods</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="e.g. brown sugar cinnamon pop-tarts"
-            style={{ flex: 1 }}
-          />
-          <button className="secondary" onClick={() => setScanning(true)}>📷 Scan</button>
-        </div>
+        <label>Search foods</label>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="e.g. Great Value chicken breast"
+        />
       </div>
-      {loading && <p className="muted small">{query ? 'Searching…' : 'Looking up barcode…'}</p>}
-      {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
-      {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
-        <p className="muted small">No matches. Try a shorter or more generic term.</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button className="secondary" style={{ flex: 1 }} onClick={() => setScanning(true)}>📷 Scan barcode</button>
+        <button className="secondary" style={{ flex: 1 }} onClick={searchWeb} disabled={loading}>🌐 Search web</button>
+      </div>
+
+      {localResults.length > 0 && (
+        <>
+          <p className="muted small" style={{ marginBottom: 6 }}>Instant matches</p>
+          {localResults.map(food => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
+              <div>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-type">{food.brand || 'Branded food'}</div>
+              </div>
+              <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </>
       )}
-      {results.map(food => (
-        <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
-          <div>
-            <div className="meal-name">{food.name}</div>
-            <div className="meal-type">{food.brand || 'Branded food'}</div>
-          </div>
-          <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
-        </div>
-      ))}
+
+      {loading && <p className="muted small">{query.trim() ? 'Searching…' : 'Looking up barcode…'}</p>}
+      {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
+      {searchedWeb && !loading && webResults.length === 0 && (
+        <p className="muted small">No web matches. Try a shorter or more generic term.</p>
+      )}
+      {webResults.length > 0 && (
+        <>
+          <p className="muted small" style={{ marginTop: localResults.length > 0 ? 10 : 0, marginBottom: 6 }}>From the web</p>
+          {webResults.map(food => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => selectFood(food)}>
+              <div>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-type">{food.brand || 'Branded food'}</div>
+              </div>
+              <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </>
+      )}
       <p className="muted small" style={{ marginTop: 10 }}>
-        Data from Open Food Facts, a free crowd-sourced database — double-check anything that looks off.
+        Instant matches are local — no wait. Web results come from Open Food Facts, a free crowd-sourced database — double-check anything that looks off.
       </p>
     </div>
   )

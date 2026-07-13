@@ -5,6 +5,7 @@ import AddFoodPanel from './AddFoodPanel.jsx'
 export default function Dashboard({
   profile, todaysEntries, onAddEntry, onRemoveEntry, todaysPlanMeals,
   customFoods, onSaveCustomFood, onDeleteCustomFood, customRecipes,
+  discoveredProducts, onRecordDiscovered,
   todaysWater, onChangeWater,
 }) {
   const [showAdd, setShowAdd] = useState(false)
@@ -101,6 +102,8 @@ export default function Dashboard({
           <AddFoodPanel
             customFoods={customFoods}
             customRecipes={customRecipes}
+            discoveredProducts={discoveredProducts}
+            onRecordDiscovered={onRecordDiscovered}
             onAddEntry={onAddEntry}
             onSaveCustomFood={onSaveCustomFood}
             onDeleteCustomFood={onDeleteCustomFood}
