@@ -3,7 +3,35 @@ import { GOALS, ACTIVITY_MULTIPLIERS, EATING_STYLES, kgToLbs } from '../lib/calc
 import { exportAllDataJSON } from '../lib/exportData.js'
 import { listCoaches } from '../lib/coaching.js'
 import { ALLERGEN_OPTIONS, DIETARY_FRAMEWORK_OPTIONS } from '../data/allergens.js'
+import { THEMES, getStoredTheme, setStoredTheme } from '../lib/theme.js'
 import GoalPlanner from './GoalPlanner.jsx'
+
+function ThemePicker() {
+  const [theme, setTheme] = useState(getStoredTheme())
+
+  function choose(key) {
+    setTheme(key)
+    setStoredTheme(key)
+  }
+
+  return (
+    <div className="theme-picker">
+      {THEMES.map(t => (
+        <div key={t.key} className={`theme-option ${theme === t.key ? 'active' : ''}`} onClick={() => choose(t.key)}>
+          <div
+            className="theme-swatch"
+            style={{
+              background: t.key === 'dark'
+                ? 'linear-gradient(135deg, #1a1717 55%, #ff3b30 55%)'
+                : 'linear-gradient(135deg, #ffffff 55%, #e0342a 55%)',
+            }}
+          />
+          {t.label}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const LEFTOVER_LABELS = {
   love: 'Happy eating the same meal 3-4 days in a row',
@@ -60,6 +88,11 @@ export default function SettingsTab({
       <div className="card">
         <h2>Account</h2>
         <p className="small" style={{ marginBottom: 0 }}>Signed in as <span className="mono">{userEmail}</span></p>
+      </div>
+
+      <div className="card">
+        <h2>Appearance</h2>
+        <ThemePicker />
       </div>
 
       <div className="card" style={{ borderColor: profile.allergies?.length ? 'var(--danger)' : undefined }}>

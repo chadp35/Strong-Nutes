@@ -22,7 +22,7 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
             style={{
               flex: 1,
               background: subtab === t.key ? 'var(--fuel)' : 'var(--surface-2)',
-              color: subtab === t.key ? '#12140f' : 'var(--text)',
+              color: subtab === t.key ? 'var(--on-fuel)' : 'var(--text)',
               borderColor: subtab === t.key ? 'var(--fuel)' : 'var(--border)',
               fontWeight: 700,
             }}

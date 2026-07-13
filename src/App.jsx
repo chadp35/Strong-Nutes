@@ -10,7 +10,7 @@ import ShoppingListTab from './components/ShoppingListTab.jsx'
 import SettingsTab from './components/SettingsTab.jsx'
 import CoachDashboard from './components/CoachDashboard.jsx'
 import { loadState, saveState, todayKey, defaultState } from './lib/storage.js'
-import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal, removeMealAt, addExtraItem } from './lib/mealPlanner.js'
+import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal, removeMealAt, addExtraItem, replaceMealAt } from './lib/mealPlanner.js'
 import { calculateTargets } from './lib/calculations.js'
 import { amICoach } from './lib/coaching.js'
 import { useOnlineStatus } from './lib/useOnlineStatus.js'
@@ -109,10 +109,29 @@ export default function App() {
     }
   }
 
-  function handleRegeneratePlan(days) {
+  function handleRegeneratePlan(days, startDate) {
     setState(s => {
-      const plan = generatePlan({ targets: s.profile.targets, personSettings: buildPersonSettings(s), days })
+      const plan = generatePlan({ targets: s.profile.targets, personSettings: buildPersonSettings(s), days, startDate })
       return { ...s, plan, shoppingChecked: {} }
+    })
+  }
+
+  function handleCancelPlan() {
+    setState(s => ({ ...s, plan: null, shoppingChecked: {} }))
+  }
+
+  // General-purpose "change this meal" — works on a core meal, an extra
+  // meal, or a side, replacing it in place with whatever the person picked
+  // from the Plan tab's swap panel (pantry match, a saved recipe, the built-in
+  // meal database, or a web search result).
+  function handleReplaceMeal(dayNumber, index, item, kind) {
+    setState(s => {
+      const dayIdx = s.plan.findIndex(d => d.day === dayNumber)
+      if (dayIdx === -1) return s
+      const newDay = replaceMealAt({ day: s.plan[dayIdx], index, item, kind })
+      const newPlan = [...s.plan]
+      newPlan[dayIdx] = newDay
+      return { ...s, plan: newPlan, shoppingChecked: {} }
     })
   }
 
@@ -327,7 +346,13 @@ export default function App() {
   }
 
   const todaysEntries = state.log[todayKey()] || []
-  const todaysPlanMeals = state.plan?.[0]?.meals || null
+  // Today's plan card should reflect whichever plan day is actually today's
+  // calendar date — not always array index 0, which used to mean "today's
+  // meals" silently kept showing Day 1 forever, even after Day 1's date had
+  // passed. Plans saved before per-day dates existed fall back to index 0.
+  const hasDatedDays = !!state.plan?.[0]?.date
+  const todaysPlanDay = state.plan ? (hasDatedDays ? state.plan.find(d => d.date === todayKey()) : state.plan[0]) : null
+  const todaysPlanMeals = todaysPlanDay?.meals || null
   const shoppingList = state.plan ? generateShoppingList(state.plan) : []
   const personSettings = buildPersonSettings(state)
 
@@ -386,10 +411,12 @@ export default function App() {
         <MealPlanTab
           plan={state.plan}
           onRegenerate={handleRegeneratePlan}
+          onCancelPlan={handleCancelPlan}
           onRegenerateMeal={handleRegenerateMeal}
           onSwapMeal={handleSwapMeal}
           onRemoveMeal={handleRemoveMeal}
           onAddExtra={handleAddExtra}
+          onReplaceMeal={handleReplaceMeal}
           targets={state.profile.targets}
           savedPantry={state.pantry}
           personSettings={personSettings}

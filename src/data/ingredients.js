@@ -43,11 +43,11 @@ export const INGREDIENTS = [
   { id: 'tofu-firm', name: 'Tofu, firm', category: 'plant-protein', per100g: { calories: 144, protein: 15.8, carbs: 2.8, fat: 8.7 } },
   { id: 'tempeh', name: 'Tempeh', category: 'plant-protein', per100g: { calories: 192, protein: 20.3, carbs: 7.6, fat: 10.8 } },
   { id: 'seitan', name: 'Seitan', category: 'plant-protein', per100g: { calories: 370, protein: 75, carbs: 14, fat: 1.9 } },
-  { id: 'lentils-cooked', name: 'Lentils (cooked)', category: 'plant-protein', per100g: { calories: 116, protein: 9, carbs: 20, fat: 0.4 } },
-  { id: 'black-beans', name: 'Black beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 132, protein: 8.9, carbs: 24, fat: 0.5 } },
-  { id: 'kidney-beans', name: 'Kidney beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 127, protein: 8.7, carbs: 22.8, fat: 0.5 } },
-  { id: 'chickpeas', name: 'Chickpeas (cooked/canned)', category: 'plant-protein', per100g: { calories: 164, protein: 8.9, carbs: 27.4, fat: 2.6 } },
-  { id: 'edamame', name: 'Edamame (shelled)', category: 'plant-protein', per100g: { calories: 122, protein: 11.9, carbs: 8.9, fat: 5.2 } },
+  { id: 'lentils-cooked', name: 'Lentils (cooked)', category: 'plant-protein', per100g: { calories: 116, protein: 9, carbs: 20, fat: 0.4 }, unitGrams: { cup: 198 } },
+  { id: 'black-beans', name: 'Black beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 132, protein: 8.9, carbs: 24, fat: 0.5 }, unitGrams: { cup: 172 } },
+  { id: 'kidney-beans', name: 'Kidney beans (cooked/canned)', category: 'plant-protein', per100g: { calories: 127, protein: 8.7, carbs: 22.8, fat: 0.5 }, unitGrams: { cup: 177 } },
+  { id: 'chickpeas', name: 'Chickpeas (cooked/canned)', category: 'plant-protein', per100g: { calories: 164, protein: 8.9, carbs: 27.4, fat: 2.6 }, unitGrams: { cup: 164 } },
+  { id: 'edamame', name: 'Edamame (shelled)', category: 'plant-protein', per100g: { calories: 122, protein: 11.9, carbs: 8.9, fat: 5.2 }, unitGrams: { cup: 155 } },
 
   // ---- Carbs / grains ----
   { id: 'rolled-oats', name: 'Rolled oats (dry)', category: 'carb', per100g: { calories: 389, protein: 16.9, carbs: 66.3, fat: 6.9 }, unitGrams: { cup: 90, tbsp: 5.6 } },

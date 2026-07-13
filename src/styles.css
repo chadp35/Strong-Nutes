@@ -1,17 +1,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap');
 
-:root {
-  --bg: #12140f;
-  --surface: #1b1f17;
-  --surface-2: #232a1c;
-  --border: #2e3527;
-  --text: #f2f4ec;
-  --muted: #8b9184;
-  --fuel: #a8e063;    /* calories / primary */
-  --protein: #ff8552; /* protein */
+/* Dark is the default (and the only dark option): bright red on dark
+   charcoal, white text — applies before data-theme is even set, so there's
+   no flash of an unstyled/wrong-colored app on first paint. */
+:root,
+[data-theme='dark'] {
+  --bg: #1a1717;
+  --surface: #221e1e;
+  --surface-2: #2c2727;
+  --border: #3c3434;
+  --text: #ffffff;
+  --muted: #b3a8a8;
+  --fuel: #ff3b30;    /* calories / primary — bright red */
+  --on-fuel: #1a1717; /* text drawn on top of a --fuel-colored surface */
+  --protein: #ff9457; /* protein */
   --carb: #4fb6e8;    /* carbs */
   --fat: #e8c34f;     /* fat */
-  --danger: #e85f5f;
+  --danger: #ffa02e;  /* over-limit / destructive — amber, distinct from brand red */
+  --radius: 14px;
+}
+
+[data-theme='light'] {
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --surface-2: #f0eeea;
+  --border: #e1dbd3;
+  --text: #201c1c;
+  --muted: #6c6360;
+  --fuel: #e0342a;
+  --on-fuel: #ffffff;
+  --protein: #d9682f;
+  --carb: #1f7fb8;
+  --fat: #b8860b;
+  --danger: #c96a08;
   --radius: 14px;
 }
 
@@ -44,9 +65,9 @@ h1, h2, h3 {
 .topbar .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--fuel), #6fa83e);
+  background: linear-gradient(135deg, var(--fuel), #a8231c);
   display: flex; align-items: center; justify-content: center;
-  font-family: 'Space Grotesk'; font-weight: 700; color: #12140f; font-size: 15px;
+  font-family: 'Space Grotesk'; font-weight: 700; color: var(--on-fuel); font-size: 15px;
 }
 .brand h1 { font-size: 20px; letter-spacing: -0.02em; }
 
@@ -104,7 +125,7 @@ input:focus, select:focus { outline: none; border-color: var(--fuel); }
 
 button.primary {
   width: 100%; padding: 13px; border-radius: 10px; border: none;
-  background: var(--fuel); color: #12140f; font-weight: 700; font-size: 15px;
+  background: var(--fuel); color: var(--on-fuel); font-weight: 700; font-size: 15px;
   font-family: 'Space Grotesk'; cursor: pointer;
 }
 button.primary:active { transform: scale(0.99); }
@@ -119,8 +140,8 @@ button.secondary {
   padding: 7px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface-2);
   font-size: 13px; cursor: pointer; color: var(--muted); user-select: none;
 }
-.tag-chip.like { background: rgba(168,224,99,0.15); border-color: var(--fuel); color: var(--fuel); }
-.tag-chip.dislike { background: rgba(232,95,95,0.12); border-color: var(--danger); color: var(--danger); }
+.tag-chip.like { background: color-mix(in srgb, var(--fuel) 16%, transparent); border-color: var(--fuel); color: var(--fuel); }
+.tag-chip.dislike { background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: var(--danger); color: var(--danger); }
 
 /* Day plan */
 .day-card { margin-bottom: 16px; }
@@ -147,25 +168,34 @@ button.secondary {
   width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--border);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;
 }
-.checkbox.on { background: var(--fuel); border-color: var(--fuel); color: #12140f; font-weight: 700; }
+.checkbox.on { background: var(--fuel); border-color: var(--fuel); color: var(--on-fuel); font-weight: 700; }
 .shop-label { flex: 1; font-size: 14px; }
 .shop-count { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono'; }
 
 .live-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--fuel); display: inline-block;
-  box-shadow: 0 0 0 0 rgba(168,224,99,0.6);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--fuel) 60%, transparent);
   animation: live-pulse 1.6s infinite;
 }
 @keyframes live-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(168,224,99,0.55); }
-  70% { box-shadow: 0 0 0 7px rgba(168,224,99,0); }
-  100% { box-shadow: 0 0 0 0 rgba(168,224,99,0); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fuel) 55%, transparent); }
+  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--fuel) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fuel) 0%, transparent); }
 }
 
 .offline-banner {
-  background: rgba(232, 195, 79, 0.12); border: 1px solid var(--fat); color: var(--fat);
+  background: color-mix(in srgb, var(--fat) 12%, transparent); border: 1px solid var(--fat); color: var(--fat);
   border-radius: 10px; padding: 10px 14px; font-size: 13px; margin: 4px 0 14px;
 }
+
+/* Segmented theme picker (Settings) */
+.theme-picker { display: flex; gap: 8px; }
+.theme-option {
+  flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid var(--border); cursor: pointer;
+  text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); background: var(--surface-2);
+}
+.theme-option.active { border-color: var(--fuel); color: var(--fuel); background: color-mix(in srgb, var(--fuel) 12%, transparent); }
+.theme-swatch { width: 100%; height: 28px; border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border); }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }

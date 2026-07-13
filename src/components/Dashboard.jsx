@@ -2,6 +2,25 @@ import React, { useState } from 'react'
 import Gauge from './Gauge.jsx'
 import AddFoodPanel from './AddFoodPanel.jsx'
 
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+// Time-of-day, date-aware greeting — a light bit of orientation/grounding at
+// the top of the day's main screen rather than dropping straight into
+// numbers, and it doesn't need a "name" field the app never actually collects.
+function greeting(now) {
+  const hour = now.getHours()
+  if (hour < 5) return 'Still up?'
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  if (hour < 21) return 'Good evening'
+  return 'Winding down'
+}
+
+function todayLabel(now) {
+  return `${WEEKDAY_NAMES[now.getDay()]}, ${MONTH_NAMES[now.getMonth()]} ${now.getDate()}`
+}
+
 export default function Dashboard({
   profile, todaysEntries, onAddEntry, onRemoveEntry, todaysPlanMeals,
   customFoods, onSaveCustomFood, onDeleteCustomFood, customRecipes,
@@ -10,6 +29,7 @@ export default function Dashboard({
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const WATER_TARGET_CUPS = 8
+  const now = new Date()
 
   const totals = todaysEntries.reduce(
     (acc, e) => ({
@@ -36,10 +56,15 @@ export default function Dashboard({
 
   return (
     <div className="app-shell" style={{ paddingTop: 20 }}>
+      <div style={{ marginBottom: 14 }}>
+        <h1 style={{ fontSize: 20, marginBottom: 2 }}>{greeting(now)}</h1>
+        <p className="muted small" style={{ marginBottom: 0 }}>{todayLabel(now)} — here's where you stand.</p>
+      </div>
+
       <div className="card">
         <h2>Today's fuel</h2>
         <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 18 }}>
-          <span className="odometer" style={{ color: totals.calories > t.calories ? '#e85f5f' : 'var(--fuel)' }}>
+          <span className="odometer" style={{ color: totals.calories > t.calories ? 'var(--danger)' : 'var(--fuel)' }}>
             {Math.round(totals.calories)}
           </span>
           <span className="odometer-unit">/ {t.calories} kcal</span>

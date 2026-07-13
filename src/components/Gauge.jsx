@@ -14,7 +14,7 @@ export default function Gauge({ label, value, target, unit = 'g', color }) {
       <div className="gauge-track">
         <div
           className="gauge-fill"
-          style={{ width: `${pct}%`, background: over ? '#e85f5f' : color }}
+          style={{ width: `${pct}%`, background: over ? 'var(--danger)' : color }}
         />
       </div>
     </div>

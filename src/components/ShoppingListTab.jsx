@@ -21,7 +21,7 @@ export default function ShoppingListTab({ list, checked, onToggle }) {
         <span className="muted small mono">{checkedCount}/{list.length}</span>
       </div>
       <p className="muted small" style={{ marginBottom: 16 }}>
-        Aggregated and totaled from your meal plan. Works for Walmart, Kroger, or wherever you shop.
+        Aggregated from your meal plan and converted to real shopping quantities (weight or item counts, not recipe measurements). Works for Walmart, Kroger, or wherever you shop.
       </p>
       <div className="card">
         {list.map(({ key, label }) => (

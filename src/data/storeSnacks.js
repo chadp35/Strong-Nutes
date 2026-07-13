@@ -14,6 +14,9 @@ export const CHAINS = [
   { key: 'racetrac', label: 'RaceTrac / QuikTrip', category: 'convenience' },
   { key: 'wawa', label: 'Wawa / Sheetz', category: 'convenience' },
   { key: 'caseys', label: "Casey's General Store", category: 'convenience' },
+  { key: 'speedway', label: 'Speedway / Cumberland Farms', category: 'convenience' },
+  { key: 'kumandgo', label: 'Kum & Go / Maverik', category: 'convenience' },
+  { key: 'travelcenter', label: "Love's / Pilot / TA Travel Center", category: 'convenience', note: 'Bigger footprint than a typical gas station — often has a fuller grab-and-go cooler and a fast food counter.' },
   { key: 'aafes_shoppette', label: 'AAFES Shoppette (base gas station)', category: 'convenience', note: 'Assortment is generally similar to a civilian convenience store — varies by installation.' },
 
   // Dollar / discount
@@ -26,18 +29,35 @@ export const CHAINS = [
   // Coffee
   { key: 'starbucks', label: 'Starbucks', category: 'coffee' },
   { key: 'dunkin', label: "Dunkin'", category: 'coffee' },
+  { key: 'timhortons', label: "Tim Hortons", category: 'coffee' },
+  { key: 'peets', label: "Peet's Coffee", category: 'coffee' },
 
   // Grocery
   { key: 'walmart', label: 'Walmart', category: 'grocery' },
   { key: 'target', label: 'Target', category: 'grocery' },
   { key: 'publix', label: 'Publix', category: 'grocery' },
   { key: 'kroger', label: 'Kroger', category: 'grocery' },
+  { key: 'traderjoes', label: "Trader Joe's", category: 'grocery' },
+  { key: 'wholefoods', label: 'Whole Foods', category: 'grocery' },
+  { key: 'aldi', label: 'Aldi', category: 'grocery' },
+  { key: 'warehouse_club', label: 'Costco / Sam\'s Club / BJ\'s', category: 'grocery', note: 'Prepared/rotisserie items are usually sold as large family-size portions — plan to portion and freeze.' },
   { key: 'aafes_commissary', label: 'Commissary / Exchange (base grocery)', category: 'grocery', note: 'Assortment is generally similar to a civilian grocery store.' },
 
   // Fast food
   { key: 'chipotle', label: 'Chipotle', category: 'fastfood' },
   { key: 'subway', label: 'Subway', category: 'fastfood' },
   { key: 'chickfila', label: 'Chick-fil-A', category: 'fastfood' },
+  { key: 'mcdonalds', label: "McDonald's", category: 'fastfood' },
+  { key: 'wendys', label: "Wendy's", category: 'fastfood' },
+  { key: 'burgerking', label: 'Burger King', category: 'fastfood' },
+  { key: 'tacobell', label: 'Taco Bell', category: 'fastfood' },
+  { key: 'sonic', label: 'Sonic', category: 'fastfood' },
+  { key: 'panera', label: 'Panera Bread', category: 'fastfood' },
+  { key: 'jimmyjohns', label: "Jimmy John's", category: 'fastfood' },
+  { key: 'jerseymikes', label: "Jersey Mike's", category: 'fastfood' },
+  { key: 'pandaexpress', label: 'Panda Express', category: 'fastfood' },
+  { key: 'culvers', label: "Culver's", category: 'fastfood' },
+  { key: 'popeyes', label: 'Popeyes', category: 'fastfood' },
   { key: 'generic_fastfood', label: 'Fast food (other)', category: 'fastfood' },
 ]
 
@@ -109,6 +129,38 @@ const CHAIN_ITEMS = [
   { id: 'sw1', name: '6" turkey sub on wheat, veggies, mustard', chain: 'subway', mealType: 'lunch', calories: 280, protein: 18, carbs: 46, fat: 4 },
   { id: 'cf1x', name: 'Grilled chicken sandwich, no bun', chain: 'chickfila', mealType: 'lunch', calories: 180, protein: 23, carbs: 5, fat: 8 },
   { id: 'cf2x', name: 'Grilled chicken nuggets, 8 ct', chain: 'chickfila', mealType: 'snack', calories: 130, protein: 25, carbs: 1, fat: 3 },
+
+  // ---- newer chains ----
+  { id: 'sp1', name: 'Hard-boiled eggs, 2-pack', chain: 'speedway', mealType: 'snack', calories: 140, protein: 12, carbs: 1, fat: 10 },
+  { id: 'tc1', name: 'Grilled chicken sandwich (hot case)', chain: 'travelcenter', mealType: 'lunch', calories: 380, protein: 30, carbs: 35, fat: 13 },
+  { id: 'kg1', name: 'Protein box (eggs, cheese, nuts)', chain: 'kumandgo', mealType: 'snack', calories: 400, protein: 18, carbs: 25, fat: 26 },
+
+  { id: 'th1', name: 'Egg white & spinach wrap', chain: 'timhortons', mealType: 'breakfast', calories: 280, protein: 15, carbs: 33, fat: 9 },
+  { id: 'pe1', name: 'Cold brew with nonfat milk, no sugar', chain: 'peets', mealType: 'snack', calories: 35, protein: 3, carbs: 5, fat: 0 },
+
+  { id: 'tj1', name: 'Grilled chicken strips (refrigerated case)', chain: 'traderjoes', mealType: 'lunch', calories: 220, protein: 38, carbs: 2, fat: 6 },
+  { id: 'tj2', name: 'Shelled edamame cup', chain: 'traderjoes', mealType: 'snack', calories: 120, protein: 11, carbs: 9, fat: 5 },
+  { id: 'wf1', name: 'Rotisserie chicken breast (deli, ~4 oz)', chain: 'wholefoods', mealType: 'lunch', calories: 190, protein: 35, carbs: 0, fat: 5 },
+  { id: 'wf2', name: 'Chicken salad bar bowl, build-your-own', chain: 'wholefoods', mealType: 'lunch', calories: 400, protein: 32, carbs: 20, fat: 20, note: 'Estimate — actual macros depend on what you build.' },
+  { id: 'al1', name: 'Grilled chicken breast strips (refrigerated)', chain: 'aldi', mealType: 'lunch', calories: 130, protein: 26, carbs: 1, fat: 2 },
+  { id: 'wc1', name: 'Rotisserie chicken (whole — portion to ~4 oz)', chain: 'warehouse_club', mealType: 'lunch', calories: 190, protein: 34, carbs: 0, fat: 5 },
+  { id: 'wc2', name: 'Individual Greek yogurt cup (multipack)', chain: 'warehouse_club', mealType: 'snack', calories: 130, protein: 12, carbs: 9, fat: 5 },
+
+  { id: 'mc1', name: 'Grilled chicken sandwich (no mayo)', chain: 'mcdonalds', mealType: 'lunch', calories: 350, protein: 37, carbs: 42, fat: 4.5 },
+  { id: 'mc2', name: 'Egg McMuffin', chain: 'mcdonalds', mealType: 'breakfast', calories: 310, protein: 17, carbs: 30, fat: 13 },
+  { id: 'wn1', name: "Grilled chicken sandwich, no mayo", chain: 'wendys', mealType: 'lunch', calories: 370, protein: 34, carbs: 36, fat: 9 },
+  { id: 'wn2', name: 'Chili, small', chain: 'wendys', mealType: 'snack', calories: 190, protein: 15, carbs: 19, fat: 6 },
+  { id: 'bk1', name: 'Grilled chicken sandwich, no mayo', chain: 'burgerking', mealType: 'lunch', calories: 380, protein: 30, carbs: 45, fat: 9 },
+  { id: 'tb1', name: 'Power Bowl, chicken, no cheese/sour cream', chain: 'tacobell', mealType: 'lunch', calories: 470, protein: 26, carbs: 44, fat: 21 },
+  { id: 'tb2', name: 'Soft chicken tacos, fresco style, 2 ct', chain: 'tacobell', mealType: 'snack', calories: 280, protein: 20, carbs: 34, fat: 8 },
+  { id: 'sn1x', name: 'Grilled chicken wrap', chain: 'sonic', mealType: 'lunch', calories: 380, protein: 26, carbs: 34, fat: 16 },
+  { id: 'pn1', name: 'Chicken & rice bowl, no cheese', chain: 'panera', mealType: 'lunch', calories: 380, protein: 33, carbs: 40, fat: 9 },
+  { id: 'pn2', name: 'Greek yogurt parfait with berries', chain: 'panera', mealType: 'breakfast', calories: 300, protein: 15, carbs: 45, fat: 7 },
+  { id: 'jj1', name: "Unwich (lettuce wrap), turkey", chain: 'jimmyjohns', mealType: 'lunch', calories: 250, protein: 24, carbs: 8, fat: 14 },
+  { id: 'jm1', name: 'Turkey sub, mini, no cheese, on wheat', chain: 'jerseymikes', mealType: 'lunch', calories: 300, protein: 22, carbs: 42, fat: 6 },
+  { id: 'pd1', name: 'Grilled teriyaki chicken (no rice/noodles)', chain: 'pandaexpress', mealType: 'lunch', calories: 275, protein: 36, carbs: 12, fat: 9 },
+  { id: 'cv1', name: 'Grilled chicken sandwich, no mayo', chain: 'culvers', mealType: 'lunch', calories: 380, protein: 34, carbs: 40, fat: 9 },
+  { id: 'pp1', name: 'Blackened chicken tenders, 3 ct', chain: 'popeyes', mealType: 'lunch', calories: 220, protein: 32, carbs: 3, fat: 8 },
 ]
 
 export function findStoreOptions({ chainKey, remainingCalories, remainingProtein, mealType = 'any', personSettings = {} }) {

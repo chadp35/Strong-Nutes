@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   searchIngredients, availableUnitsFor, calculateRecipeTotals,
   applyDrainedFat, suggestServings, computePerServing, ingredientFromOFF,
+  findIngredientByName,
 } from '../lib/recipeBuilder.js'
 import { searchBrandedFoods, getProductByBarcode } from '../lib/openFoodFacts.js'
 import { searchLocalProducts } from '../lib/localProductSearch.js'
@@ -16,12 +17,40 @@ const MEAL_TYPES = [
   { key: 'snack', label: 'Snack' },
 ]
 
+// A saved recipe normally carries builderState (the exact ingredient lines
+// used to build it) so re-opening it for editing is a perfect restore. If
+// that's ever missing — an older save, or any other gap — this rebuilds
+// approximate lines from the recipe's per-serving ingredient list instead of
+// leaving the editor blank and forcing a from-scratch re-entry. Matched
+// ingredients carry real nutrition; anything unmatched is flagged so it can
+// be re-searched for accurate macros.
+function reconstructLines(existingRecipe) {
+  if (!existingRecipe?.ingredients?.length) return { lines: [], hadUnmatched: false }
+  let hadUnmatched = false
+  const lines = existingRecipe.ingredients.map((ing, idx) => {
+    const match = findIngredientByName(ing.name)
+    if (!match) hadUnmatched = true
+    const ingredient = match || {
+      id: `legacy-${idx}-${(ing.name || 'item').toLowerCase().replace(/\s+/g, '-')}`,
+      name: ing.name || 'Unknown ingredient',
+      per100g: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+      unitGrams: {},
+    }
+    const units = availableUnitsFor(ingredient)
+    const unit = ing.unit && units.includes(ing.unit) ? ing.unit : (units[0] || 'g')
+    return { ingredient, qty: ing.qty || 1, unit, isWrapper: !!ing.isWrapper }
+  })
+  return { lines, hadUnmatched }
+}
+
 export default function RecipeBuilder({ allergies, discoveredProducts, onRecordDiscovered, onSaveRecipe, onDone, existingRecipe }) {
   const editing = !!existingRecipe
   const saved = existingRecipe?.builderState
+  const fallback = !saved?.lines?.length ? reconstructLines(existingRecipe) : null
 
   const [name, setName] = useState(existingRecipe?.name || '')
-  const [lines, setLines] = useState(saved?.lines || []) // { ingredient, qty, unit, isWrapper }
+  const [lines, setLines] = useState(saved?.lines?.length ? saved.lines : fallback?.lines || []) // { ingredient, qty, unit, isWrapper }
+  const [showReconstructedNotice] = useState(!!fallback && fallback.lines.length > 0)
   const [query, setQuery] = useState('')
   const [webResults, setWebResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -142,6 +171,20 @@ export default function RecipeBuilder({ allergies, discoveredProducts, onRecordD
           ? 'Editing this recipe — adjust ingredients, servings, or portioning and save.'
           : "Enter what actually goes into the dish and I'll calculate the nutrition — including handling for drained fat and real cooked weight, so bulk-cooked dishes portion accurately."}
       </p>
+
+      {showReconstructedNotice && (
+        <div className="card" style={{ borderColor: 'var(--fat)', marginBottom: 16 }}>
+          <p className="small" style={{ color: 'var(--fat)', marginBottom: fallback?.hadUnmatched ? 6 : 0 }}>
+            Rebuilt this recipe's ingredients from what was saved with it.
+          </p>
+          {fallback?.hadUnmatched && (
+            <p className="small" style={{ marginBottom: 0 }}>
+              One or more ingredients couldn't be matched back to the database and show 0 kcal below —
+              re-search and re-add those specific lines to restore accurate macros.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="field">
         <label>Recipe name</label>

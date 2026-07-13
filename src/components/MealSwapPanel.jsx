@@ -1,27 +1,36 @@
 import React, { useState } from 'react'
-import { suggestSides, scaleItemToGrams } from '../lib/mealPlanner.js'
+import { browseMeals, matchPantryToMeals } from '../lib/mealPlanner.js'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
 import { searchLocalProducts } from '../lib/localProductSearch.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
 
 const TABS = [
-  { key: 'suggested', label: 'Suggested' },
+  { key: 'browse', label: 'Browse' },
   { key: 'recipes', label: 'My Recipes' },
-  { key: 'search', label: 'Search' },
+  { key: 'pantry', label: 'Pantry' },
+  { key: 'search', label: 'Web Search' },
 ]
 
-export default function AddExtraPanel({ remainingCalories, remainingProtein, personSettings, excludeIds, customRecipes, discoveredProducts, onRecordDiscovered, onPick }) {
-  const [tab, setTab] = useState('suggested')
+// The full "change this meal" panel used by the Plan tab — replaces the old
+// pantry-only swap with four ways to find a replacement: browse the built-in
+// meal database, pick one of your own saved recipes, match against what's in
+// your pantry, or search the web/scan a barcode for a branded product.
+// Works the same whether swapping a core meal or an extra/side.
+export default function MealSwapPanel({
+  mealType = 'any', excludeIds = [], personSettings, customRecipes,
+  savedPantry, discoveredProducts, onRecordDiscovered, onPick, onCancel,
+}) {
+  const [tab, setTab] = useState('browse')
 
   return (
     <div className="card" style={{ background: 'var(--surface-2)', marginTop: 10 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
         {TABS.map(t => (
           <button
             key={t.key}
             className="secondary"
             style={{
-              flex: 1, fontWeight: 700, fontSize: 13,
+              flex: '1 1 72px', fontWeight: 700, fontSize: 12,
               background: tab === t.key ? 'var(--fuel)' : 'var(--surface)',
               color: tab === t.key ? 'var(--on-fuel)' : 'var(--text)',
             }}
@@ -32,85 +41,57 @@ export default function AddExtraPanel({ remainingCalories, remainingProtein, per
         ))}
       </div>
 
-      {tab === 'suggested' && (
-        <SuggestedList
-          remainingCalories={remainingCalories}
-          remainingProtein={remainingProtein}
-          personSettings={personSettings}
-          excludeIds={excludeIds}
-          onPick={(item) => onPick(item, 'side')}
-        />
+      {tab === 'browse' && (
+        <BrowseList mealType={mealType} excludeIds={excludeIds} personSettings={personSettings} onPick={item => onPick(item, 'meal')} />
       )}
       {tab === 'recipes' && (
-        <MyRecipesPicker customRecipes={customRecipes} onPick={(item) => onPick(item, 'meal')} />
+        <RecipesList customRecipes={customRecipes} onPick={item => onPick(item, 'meal')} />
+      )}
+      {tab === 'pantry' && (
+        <PantryMatch mealType={mealType} excludeIds={excludeIds} personSettings={personSettings} savedPantry={savedPantry} onPick={item => onPick(item, 'meal')} />
       )}
       {tab === 'search' && (
-        <WebAndLocalSearch discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} onPick={(item) => onPick(item, 'side')} />
+        <WebSearch discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} onPick={item => onPick(item, 'side')} />
+      )}
+
+      {onCancel && (
+        <button className="secondary" style={{ width: '100%', marginTop: 10 }} onClick={onCancel}>Cancel</button>
       )}
     </div>
   )
 }
 
-function SuggestedList({ remainingCalories, remainingProtein, personSettings, excludeIds, onPick }) {
-  const sides = suggestSides({ remainingCalories, remainingProtein, personSettings, excludeIds })
-
-  if (sides.length === 0) {
-    return <p className="muted small">No local suggestions fit right now — try the Search tab.</p>
+function BrowseList({ mealType, excludeIds, personSettings, onPick }) {
+  const results = browseMeals({ type: mealType, personSettings, excludeIds }).slice(0, 25)
+  if (results.length === 0) {
+    return <p className="muted small">Nothing matches your current filters for this meal type — try Web Search instead.</p>
   }
-
   return (
     <div>
-      {sides.map(item => (
-        <div className="meal-row" key={item.id} style={{ cursor: 'pointer' }} onClick={() => onPick(item)}>
+      {results.map(meal => (
+        <div className="meal-row" key={meal.id} style={{ cursor: 'pointer' }} onClick={() => onPick(meal)}>
           <div>
-            <div className="meal-name">{item.name}</div>
-            <div className="meal-type">P{item.protein}g · C{item.carbs}g · F{item.fat}g</div>
+            <div className="meal-name">{meal.name}</div>
+            <div className="meal-type">{meal.type}</div>
           </div>
-          <span className="meal-macros">{item.calories} kcal</span>
+          <span className="meal-macros">{meal.calories} kcal</span>
         </div>
       ))}
     </div>
   )
 }
 
-// Lets you add one of your own saved recipes to this day, with the
-// recommended serving size shown in grams and a direct gram adjuster —
-// scale it up or down to exactly what you're actually eating, not just
-// whole servings.
-function MyRecipesPicker({ customRecipes, onPick }) {
-  const [selected, setSelected] = useState(null)
-  const [grams, setGrams] = useState(0)
-
+function RecipesList({ customRecipes, onPick }) {
   if (!customRecipes || customRecipes.length === 0) {
     return <p className="muted small">No saved recipes yet. Build one from the Pantry tab's "My Recipe" mode.</p>
   }
-
-  if (selected) {
-    const scaled = scaleItemToGrams(selected, grams)
-    return (
-      <div>
-        <p className="meal-name" style={{ marginBottom: 2 }}>{selected.name}</p>
-        <p className="muted small" style={{ marginBottom: 10 }}>Recommended: {selected.servingWeightG}g per serving</p>
-        <div className="field">
-          <label>Amount (grams)</label>
-          <input type="number" value={grams} onChange={e => setGrams(Math.max(0, Number(e.target.value) || 0))} />
-        </div>
-        <p className="mono small" style={{ marginBottom: 12 }}>
-          {scaled.calories} kcal · P{scaled.protein}g · C{scaled.carbs}g · F{scaled.fat}g
-        </p>
-        <button className="primary" style={{ marginBottom: 8 }} onClick={() => onPick(scaled)}>Add this</button>
-        <button className="secondary" style={{ width: '100%' }} onClick={() => setSelected(null)}>Back</button>
-      </div>
-    )
-  }
-
   return (
     <div>
       {customRecipes.map(r => (
-        <div className="meal-row" key={r.id} style={{ cursor: 'pointer' }} onClick={() => { setSelected(r); setGrams(r.servingWeightG || 100) }}>
+        <div className="meal-row" key={r.id} style={{ cursor: 'pointer' }} onClick={() => onPick(r)}>
           <div>
             <div className="meal-name">{r.name}</div>
-            <div className="meal-type">{r.type} · ≈{r.servingWeightG}g/serving</div>
+            <div className="meal-type">{r.type}</div>
           </div>
           <span className="meal-macros">{r.calories} kcal</span>
         </div>
@@ -119,7 +100,53 @@ function MyRecipesPicker({ customRecipes, onPick }) {
   )
 }
 
-function WebAndLocalSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
+function PantryMatch({ mealType, excludeIds, personSettings, savedPantry, onPick }) {
+  const [pantryText, setPantryText] = useState((savedPantry || []).join('\n'))
+  const [results, setResults] = useState(null)
+
+  function find() {
+    setResults(matchPantryToMeals(pantryText, { type: mealType, excludeIds, personSettings }))
+  }
+
+  return (
+    <div>
+      <div className="field">
+        <label>What do you have on hand?</label>
+        <textarea
+          value={pantryText}
+          onChange={e => setPantryText(e.target.value)}
+          rows={3}
+          style={{
+            width: '100%', background: 'var(--surface)', border: '1px solid var(--border)',
+            color: 'var(--text)', padding: '10px 11px', borderRadius: 10, fontSize: 14,
+            fontFamily: 'Inter', resize: 'vertical',
+          }}
+        />
+        {(!savedPantry || savedPantry.length === 0) && (
+          <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>
+            Tip: save your staples on the Pantry tab's "My Pantry" mode and they'll show up here automatically next time.
+          </p>
+        )}
+      </div>
+      <button className="secondary" style={{ marginBottom: 10 }} onClick={find}>Find a match</button>
+
+      {results && results.length === 0 && (
+        <p className="muted small">No matches for that — try adding a staple or two, or use Browse / Web Search instead.</p>
+      )}
+      {results && results.map(({ meal, matched }) => (
+        <div className="meal-row" key={meal.id} style={{ cursor: 'pointer' }} onClick={() => onPick(meal)}>
+          <div>
+            <div className="meal-name">{meal.name}</div>
+            <div className="meal-type">{matched.length}/{meal.ingredients.length} on hand</div>
+          </div>
+          <span className="meal-macros">{meal.calories} kcal</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WebSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
   const [query, setQuery] = useState('')
   const [webResults, setWebResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -155,8 +182,7 @@ function WebAndLocalSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
     setLoading(true)
     setError('')
     try {
-      const food = await getProductByBarcode(code)
-      selectFood(food)
+      selectFood(await getProductByBarcode(code))
     } catch (err) {
       setError(err.message)
     } finally {
@@ -194,7 +220,7 @@ function WebAndLocalSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
             })
           }}
         >
-          Add this
+          Use this
         </button>
       </div>
     )
@@ -203,7 +229,7 @@ function WebAndLocalSearch({ discoveredProducts, onRecordDiscovered, onPick }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. Great Value peanut butter" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && searchWeb()} />
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="e.g. Great Value grilled chicken" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && searchWeb()} />
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button className="secondary" style={{ flex: 1 }} onClick={() => setScanning(true)}>📷 Scan barcode</button>

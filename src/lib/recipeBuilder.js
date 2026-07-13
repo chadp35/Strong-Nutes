@@ -16,6 +16,20 @@ export function searchIngredients(query) {
   return INGREDIENTS.filter(i => i.name.toLowerCase().includes(q)).slice(0, 15)
 }
 
+// Best-effort name match against the local database — used to rebuild a
+// recipe's ingredient lines from its saved {name, qty, unit} list when the
+// richer builderState snapshot isn't available (see reconstructLines in
+// RecipeBuilder.jsx).
+export function findIngredientByName(name) {
+  const q = (name || '').trim().toLowerCase()
+  if (!q) return null
+  return (
+    INGREDIENTS.find(i => i.name.toLowerCase() === q) ||
+    INGREDIENTS.find(i => i.name.toLowerCase().includes(q) || q.includes(i.name.toLowerCase())) ||
+    null
+  )
+}
+
 // Adapts an Open Food Facts search/barcode result into the same shape as a
 // local ingredients.js entry, so it can flow through the exact same
 // nutrition math — used when the local database doesn't have what someone's

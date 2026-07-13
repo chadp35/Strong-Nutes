@@ -1,7 +1,11 @@
 import React, { Suspense, useEffect, useState, lazy } from 'react'
 import { matchPantryToMeals, formatIngredient } from '../lib/mealPlanner.js'
 import { CHAINS, findStoreOptions } from '../data/storeSnacks.js'
+import { searchIngredients } from '../lib/recipeBuilder.js'
+import { searchBrandedFoods, getProductByBarcode } from '../lib/openFoodFacts.js'
+import { searchLocalProducts } from '../lib/localProductSearch.js'
 import BulkPrepControls from './BulkPrepControls.jsx'
+import BarcodeScanner from './BarcodeScanner.jsx'
 
 const RecipeBuilder = lazy(() => import('./RecipeBuilder.jsx'))
 
@@ -49,7 +53,7 @@ export default function PantryTab({
             style={{
               flex: 1, fontWeight: 700, fontSize: 13,
               background: mode === m.key ? 'var(--fuel)' : 'var(--surface-2)',
-              color: mode === m.key ? '#12140f' : 'var(--text)',
+              color: mode === m.key ? 'var(--on-fuel)' : 'var(--text)',
               borderColor: mode === m.key ? 'var(--fuel)' : 'var(--border)',
             }}
             onClick={() => { setMode(m.key); if (m.key !== 'recipe') closeBuilder() }}
@@ -60,7 +64,15 @@ export default function PantryTab({
       </div>
 
       {mode === 'kitchen' && (
-        <KitchenMode savedPantry={savedPantry} onSavePantry={onSavePantry} onLogMeal={onLogMeal} remainingTargets={remainingTargets} personSettings={personSettings} />
+        <KitchenMode
+          savedPantry={savedPantry}
+          onSavePantry={onSavePantry}
+          onLogMeal={onLogMeal}
+          remainingTargets={remainingTargets}
+          personSettings={personSettings}
+          discoveredProducts={discoveredProducts}
+          onRecordDiscovered={onRecordDiscovered}
+        />
       )}
       {mode === 'onthego' && (
         <OnTheGoMode onLogMeal={onLogMeal} remainingTargets={remainingTargets} personSettings={personSettings} />
@@ -88,6 +100,11 @@ export default function PantryTab({
       {mode === 'recipe' && builderTarget && (
         <Suspense fallback={<p className="muted small">Loading recipe builder…</p>}>
           <RecipeBuilder
+            // Forces a full remount whenever the target recipe changes —
+            // without this, React can reuse the same component instance
+            // across two different recipes and keep the FIRST recipe's
+            // ingredient lines in state instead of loading the new one's.
+            key={builderTarget === 'new' ? 'new' : builderTarget.id}
             allergies={allergies}
             discoveredProducts={discoveredProducts}
             onRecordDiscovered={onRecordDiscovered}
@@ -101,10 +118,16 @@ export default function PantryTab({
   )
 }
 
-function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, personSettings }) {
+function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, personSettings, discoveredProducts, onRecordDiscovered }) {
   const [pantryText, setPantryText] = useState(savedPantry.join('\n'))
   const [type, setType] = useState('any')
   const [results, setResults] = useState(null)
+
+  function addItemName(name) {
+    const nextText = pantryText.trim() ? `${pantryText.trim()}\n${name}` : name
+    setPantryText(nextText)
+    onSavePantry(nextText.split(/[,\n]/).map(s => s.trim()).filter(Boolean))
+  }
 
   function handleFind() {
     const items = pantryText.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
@@ -115,8 +138,10 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
   return (
     <div>
       <p className="muted small" style={{ marginBottom: 16 }}>
-        List what you've got — one item per line or comma-separated — and I'll find meals built for your macros that use it.
+        List what you've got — one item per line or comma-separated, or scan/search below to add items instantly. I'll find meals built for your macros that use it.
       </p>
+
+      <PantryItemFinder discoveredProducts={discoveredProducts} onRecordDiscovered={onRecordDiscovered} onAdd={addItemName} />
 
       <div className="card">
         <div className="field">
@@ -179,6 +204,131 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
         <p className="muted small" style={{ textAlign: 'center' }}>
           Remaining today: {Math.max(remainingTargets.calories, 0)} kcal · {Math.max(remainingTargets.protein, 0)}g protein
         </p>
+      )}
+    </div>
+  )
+}
+
+// Barcode scanner + full food database (local raw ingredients, your own
+// previously discovered products, and a live Open Food Facts web search) for
+// adding pantry items — the same lookup power as the recipe builder and food
+// log, so building your pantry list doesn't mean typing everything by hand.
+function PantryItemFinder({ discoveredProducts, onRecordDiscovered, onAdd }) {
+  const [query, setQuery] = useState('')
+  const [webResults, setWebResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [searchedWeb, setSearchedWeb] = useState(false)
+  const [justAdded, setJustAdded] = useState('')
+
+  const localIngredients = searchIngredients(query)
+  const localProducts = searchLocalProducts(query, discoveredProducts)
+
+  async function searchWeb() {
+    if (query.trim().length < 2) return
+    setLoading(true)
+    setError('')
+    setSearchedWeb(true)
+    try {
+      setWebResults(await searchBrandedFoods(query))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function addAndClear(name, product) {
+    onAdd(name)
+    if (product) onRecordDiscovered?.(product)
+    setQuery('')
+    setWebResults([])
+    setSearchedWeb(false)
+    setJustAdded(name)
+    setTimeout(() => setJustAdded(''), 2500)
+  }
+
+  async function handleBarcodeDetected(code) {
+    setScanning(false)
+    setLoading(true)
+    setError('')
+    try {
+      const product = await getProductByBarcode(code)
+      addAndClear(product.brand ? `${product.name} (${product.brand})` : product.name, product)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (scanning) {
+    return <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
+  }
+
+  return (
+    <div className="card" style={{ background: 'var(--surface-2)' }}>
+      <h2>Add an item</h2>
+      <div className="field">
+        <input
+          value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Search the food database, e.g. chicken breast or Great Value rice"
+          onKeyDown={e => e.key === 'Enter' && searchWeb()}
+        />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button className="secondary" style={{ flex: 1 }} onClick={() => setScanning(true)}>📷 Scan barcode</button>
+        <button className="secondary" style={{ flex: 1 }} onClick={searchWeb} disabled={loading}>🌐 Search web</button>
+      </div>
+
+      {justAdded && <p className="small" style={{ color: 'var(--fuel)', marginBottom: 10 }}>Added "{justAdded}" to your pantry.</p>}
+
+      {localIngredients.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <p className="muted small" style={{ marginBottom: 6 }}>Raw ingredients</p>
+          {localIngredients.map(ing => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={ing.id} onClick={() => addAndClear(ing.name)}>
+              <div className="meal-name">{ing.name}</div>
+              <span className="meal-macros">{ing.per100g.calories} kcal/100g</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {localProducts.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <p className="muted small" style={{ marginBottom: 6 }}>Branded products</p>
+          {localProducts.map(p => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={p.id} onClick={() => addAndClear(p.brand ? `${p.name} (${p.brand})` : p.name, p)}>
+              <div>
+                <div className="meal-name">{p.name}</div>
+                <div className="meal-type">{p.brand}</div>
+              </div>
+              <span className="meal-macros">{p.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading && <p className="muted small">{query.trim() ? 'Searching…' : 'Looking up barcode…'}</p>}
+      {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
+      {searchedWeb && !loading && webResults.length === 0 && (
+        <p className="muted small">No web matches. Try a shorter or more generic term.</p>
+      )}
+      {webResults.length > 0 && (
+        <div>
+          <p className="muted small" style={{ marginBottom: 6 }}>From the web</p>
+          {webResults.map(food => (
+            <div className="meal-row" style={{ cursor: 'pointer' }} key={food.id} onClick={() => addAndClear(food.brand ? `${food.name} (${food.brand})` : food.name, food)}>
+              <div>
+                <div className="meal-name">{food.name}</div>
+                <div className="meal-type">{food.brand || 'Branded food'}</div>
+              </div>
+              <span className="meal-macros">{food.caloriesPer100g} kcal/100g</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

@@ -1,15 +1,22 @@
 import React, { useState } from 'react'
-import {
-  formatIngredient,
-  matchPantryToMeals,
-} from '../lib/mealPlanner.js'
+import { formatIngredient } from '../lib/mealPlanner.js'
 import AddExtraPanel from './AddExtraPanel.jsx'
 import BulkPrepControls from './BulkPrepControls.jsx'
+import MealSwapPanel from './MealSwapPanel.jsx'
 
-export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, targets, savedPantry, personSettings, customRecipes, discoveredProducts, onRecordDiscovered }) {
+function todayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export default function MealPlanTab({
+  plan, onRegenerate, onCancelPlan, onRegenerateMeal, onSwapMeal, onRemoveMeal, onAddExtra, onReplaceMeal,
+  targets, savedPantry, personSettings, customRecipes, discoveredProducts, onRecordDiscovered,
+}) {
   const [expanded, setExpanded] = useState(null)
-  const [pantryModeKey, setPantryModeKey] = useState(null)
+  const [swapKey, setSwapKey] = useState(null)
   const [addPanelDay, setAddPanelDay] = useState(null)
+  const [startDate, setStartDate] = useState(plan?.[0]?.date || todayKey())
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
 
   if (!plan) {
     return (
@@ -17,7 +24,11 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
         <div className="empty-state">
           <h3>No plan yet</h3>
           <p className="small">Generate a meal plan built around your targets and preferences.</p>
-          <button className="primary" style={{ marginTop: 14 }} onClick={() => onRegenerate(7)}>
+          <div className="field" style={{ textAlign: 'left', marginTop: 18, marginBottom: 10 }}>
+            <label>Start date (this becomes Day 1)</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <button className="primary" onClick={() => onRegenerate(7, startDate)}>
             Generate 7-day plan
           </button>
         </div>
@@ -29,23 +40,55 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
     <div className="app-shell" style={{ paddingTop: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h1 style={{ fontSize: 20 }}>Your meal plan</h1>
-        <button className="secondary" onClick={() => onRegenerate(7)}>Regenerate all</button>
       </div>
       <p className="muted small" style={{ marginBottom: 16 }}>
         Targeting {targets.calories} kcal/day · {targets.protein}g protein. Real whole meals — extra calories come from additional meals or sides, never resized portions.
       </p>
 
+      <div className="card" style={{ background: 'var(--surface-2)' }}>
+        <div className="field" style={{ marginBottom: 10 }}>
+          <label>Day 1 start date</label>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ maxWidth: 200 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="secondary" style={{ flex: '1 1 140px' }} onClick={() => onRegenerate(plan.length, startDate)}>
+            🔄 Regenerate all
+          </button>
+          {!confirmingCancel && (
+            <button className="secondary" style={{ flex: '1 1 140px', color: 'var(--danger)' }} onClick={() => setConfirmingCancel(true)}>
+              🗑 Cancel plan
+            </button>
+          )}
+          {confirmingCancel && (
+            <>
+              <button className="secondary" style={{ flex: '1 1 100px', color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={onCancelPlan}>
+                Yes, cancel it
+              </button>
+              <button className="secondary" style={{ flex: '1 1 100px' }} onClick={() => setConfirmingCancel(false)}>
+                Never mind
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
       {plan.map(day => {
         const coreMeals = day.meals.filter(m => m.isCore)
         const extraItems = day.meals.filter(m => !m.isCore)
+        const isToday = day.date === todayKey()
 
         return (
-          <div className="card day-card" key={day.day}>
-            <div className="day-title">Day {day.day} <span className="muted small mono">— {day.totals.calories} kcal</span></div>
+          <div className="card day-card" key={day.day} style={isToday ? { borderColor: 'var(--fuel)' } : undefined}>
+            <div className="day-title">
+              {day.dateLabel || `Day ${day.day}`}
+              {isToday && <span className="mono small" style={{ color: 'var(--fuel)', marginLeft: 8 }}>TODAY</span>}
+              {' '}<span className="muted small mono">— {day.totals.calories} kcal</span>
+            </div>
 
             {coreMeals.map((meal, mealIndex) => {
               const key = `${day.day}-core-${mealIndex}-${meal.id}`
-              const isPantryMode = pantryModeKey === key
+              const overallIndex = day.meals.indexOf(meal)
+              const isSwapping = swapKey === key
               return (
                 <div key={key}>
                   <div className="meal-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === key ? null : key)}>
@@ -57,26 +100,35 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
                   </div>
                   {expanded === key && (
                     <div className="meal-detail">
-                      <div style={{ display: 'flex', gap: 8, margin: '8px 0 12px' }}>
-                        <button className="secondary" onClick={() => { onRegenerateMeal(day.day, mealIndex); setPantryModeKey(null) }}>
-                          🔄 Regenerate this meal
+                      <div style={{ display: 'flex', gap: 8, margin: '8px 0 12px', flexWrap: 'wrap' }}>
+                        <button className="secondary" onClick={() => { onRegenerateMeal(day.day, mealIndex); setSwapKey(null) }}>
+                          🔄 Regenerate
                         </button>
-                        <button className="secondary" onClick={() => setPantryModeKey(isPantryMode ? null : key)}>
-                          🥫 {isPantryMode ? 'Cancel' : 'Use pantry instead'}
+                        <button className="secondary" onClick={() => setSwapKey(isSwapping ? null : key)}>
+                          🔁 {isSwapping ? 'Cancel change' : 'Change this meal'}
                         </button>
+                        {coreMeals.length > 1 && (
+                          <button className="secondary" style={{ color: 'var(--danger)' }} onClick={() => { onRemoveMeal(day.day, overallIndex); setExpanded(null) }}>
+                            Remove
+                          </button>
+                        )}
                       </div>
 
-                      {isPantryMode && (
-                        <PantrySwap
+                      {isSwapping && (
+                        <MealSwapPanel
                           mealType={meal.type}
-                          savedPantry={savedPantry}
-                          excludeIds={[meal.id]}
+                          excludeIds={coreMeals.map(m => m.id)}
                           personSettings={personSettings}
-                          onPick={(replacement) => { onSwapMeal(day.day, mealIndex, replacement); setPantryModeKey(null) }}
+                          customRecipes={customRecipes}
+                          savedPantry={savedPantry}
+                          discoveredProducts={discoveredProducts}
+                          onRecordDiscovered={onRecordDiscovered}
+                          onPick={(item) => { onSwapMeal(day.day, mealIndex, item); setSwapKey(null) }}
+                          onCancel={() => setSwapKey(null)}
                         />
                       )}
 
-                      {!isPantryMode && (
+                      {!isSwapping && (
                         <>
                           <strong>Recipe:</strong> {meal.recipe}
                           <br />
@@ -98,6 +150,7 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
                 {extraItems.map((item, i) => {
                   const overallIndex = coreMeals.length + i
                   const key = `${day.day}-extra-${overallIndex}-${item.id}`
+                  const isSwapping = swapKey === key
                   return (
                     <div key={key}>
                       <div className="meal-row" style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === key ? null : key)}>
@@ -110,17 +163,41 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
                           <button className="remove-btn" onClick={e => { e.stopPropagation(); onRemoveMeal(day.day, overallIndex) }}>×</button>
                         </div>
                       </div>
-                      {expanded === key && item.recipe && (
+                      {expanded === key && (
                         <div className="meal-detail">
-                          {item.ingredients?.length > 0 && (
+                          <div style={{ display: 'flex', gap: 8, margin: '8px 0 12px' }}>
+                            <button className="secondary" onClick={() => setSwapKey(isSwapping ? null : key)}>
+                              🔁 {isSwapping ? 'Cancel change' : 'Change this'}
+                            </button>
+                          </div>
+
+                          {isSwapping && (
+                            <MealSwapPanel
+                              mealType="any"
+                              excludeIds={day.meals.map(m => m.id)}
+                              personSettings={personSettings}
+                              customRecipes={customRecipes}
+                              savedPantry={savedPantry}
+                              discoveredProducts={discoveredProducts}
+                              onRecordDiscovered={onRecordDiscovered}
+                              onPick={(newItem, kind) => { onReplaceMeal(day.day, overallIndex, newItem, kind); setSwapKey(null) }}
+                              onCancel={() => setSwapKey(null)}
+                            />
+                          )}
+
+                          {!isSwapping && item.recipe && (
                             <>
-                              <strong>Ingredients:</strong> {item.ingredients.map(formatIngredient).join(', ')}
+                              {item.ingredients?.length > 0 && (
+                                <>
+                                  <strong>Ingredients:</strong> {item.ingredients.map(formatIngredient).join(', ')}
+                                  <br />
+                                </>
+                              )}
+                              <strong>{item.isExtra ? 'Recipe' : 'How to eat it'}:</strong> {item.recipe}
                               <br />
+                              <span className="mono">P{item.protein}g · C{item.carbs}g · F{item.fat}g</span>
                             </>
                           )}
-                          <strong>{item.isExtra ? 'Recipe' : 'How to eat it'}:</strong> {item.recipe}
-                          <br />
-                          <span className="mono">P{item.protein}g · C{item.carbs}g · F{item.fat}g</span>
                         </div>
                       )}
                     </div>
@@ -148,45 +225,6 @@ export default function MealPlanTab({ plan, onRegenerate, onRegenerateMeal, onSw
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function PantrySwap({ mealType, savedPantry, excludeIds, personSettings, onPick }) {
-  const [pantryText, setPantryText] = useState((savedPantry || []).join('\n'))
-  const [results, setResults] = useState(null)
-
-  function find() {
-    setResults(matchPantryToMeals(pantryText, { type: mealType, excludeIds, personSettings }))
-  }
-
-  return (
-    <div style={{ marginBottom: 4 }}>
-      <div className="field">
-        <label>What do you have for {mealType}?</label>
-        <textarea
-          value={pantryText}
-          onChange={e => setPantryText(e.target.value)}
-          rows={3}
-          style={{
-            width: '100%', background: 'var(--surface-2)', border: '1px solid var(--border)',
-            color: 'var(--text)', padding: '10px 11px', borderRadius: 10, fontSize: 14,
-            fontFamily: 'Inter', resize: 'vertical',
-          }}
-        />
-      </div>
-      <button className="secondary" style={{ marginBottom: 10 }} onClick={find}>Find a match</button>
-
-      {results && results.length === 0 && <p className="muted small">No matches — try adding a staple or two.</p>}
-      {results && results.map(({ meal, matched }) => (
-        <div className="meal-row" key={meal.id} style={{ cursor: 'pointer' }} onClick={() => onPick(meal)}>
-          <div>
-            <div className="meal-name">{meal.name}</div>
-            <div className="meal-type">{matched.length}/{meal.ingredients.length} on hand</div>
-          </div>
-          <span className="meal-macros">{meal.calories} kcal</span>
-        </div>
-      ))}
     </div>
   )
 }
