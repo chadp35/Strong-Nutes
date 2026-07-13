@@ -1,8 +1,10 @@
+import { generateComboMeals } from '../lib/comboGenerator.js'
+
 // Each meal's calories/macros/ingredients are for ONE serving. servingWeightG is
 // an approximate total weight of that one plated serving, so it can be used as a
 // food-scale target when someone preps multiple portions ahead of time.
 // Ingredient qty scales linearly — multiply qty by N to prep N servings.
-export const MEALS = [
+const HAND_WRITTEN_MEALS = [
   // ---- BREAKFAST ----
   {
     id: 'b1', name: 'Greek Yogurt Protein Bowl', type: 'breakfast',
@@ -78,6 +80,103 @@ export const MEALS = [
       { name: 'Salsa', qty: 2, unit: 'tbsp' },
     ],
     recipe: 'Scramble eggs with sausage crumbles. Fill tortilla, add cheese and salsa, roll tightly.',
+  },
+  {
+    id: 'b7', name: 'Ham & Cheese Scramble', type: 'breakfast',
+    tags: ['eggs', 'savory', 'quick', 'meat'],
+    calories: 390, protein: 32, carbs: 4, fat: 26, servingWeightG: 280,
+    ingredients: [
+      { name: 'Eggs', qty: 3, unit: 'large' },
+      { name: 'Ham (diced)', qty: 2, unit: 'oz' },
+      { name: 'Shredded cheddar', qty: 0.25, unit: 'cup' },
+      { name: 'Olive oil', qty: 1, unit: 'tsp' },
+    ],
+    recipe: 'Sauté diced ham 2 min. Add whisked eggs, scramble until set. Top with cheddar.',
+  },
+  {
+    id: 'b8', name: 'Blueberry Protein Pancakes', type: 'breakfast',
+    tags: ['sweet', 'vegetarian', 'meal-prep'],
+    calories: 430, protein: 28, carbs: 48, fat: 12, servingWeightG: 320,
+    ingredients: [
+      { name: 'Rolled oats', qty: 0.5, unit: 'cup' },
+      { name: 'Cottage cheese', qty: 0.5, unit: 'cup' },
+      { name: 'Eggs', qty: 2, unit: 'large' },
+      { name: 'Blueberries', qty: 0.5, unit: 'cup' },
+      { name: 'Maple syrup', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Blend oats, cottage cheese, and eggs until smooth. Cook on a griddle as pancakes, folding in blueberries. Top with maple syrup.',
+  },
+  {
+    id: 'b9', name: 'Peanut Butter Banana Toast', type: 'breakfast',
+    tags: ['quick', 'vegetarian', 'sweet'],
+    calories: 420, protein: 14, carbs: 55, fat: 18, servingWeightG: 220,
+    ingredients: [
+      { name: 'Whole wheat bread', qty: 2, unit: 'slices' },
+      { name: 'Peanut butter', qty: 2, unit: 'tbsp' },
+      { name: 'Banana', qty: 1, unit: '' },
+      { name: 'Honey', qty: 1, unit: 'tsp' },
+    ],
+    recipe: 'Toast bread. Spread peanut butter, top with sliced banana and a drizzle of honey.',
+  },
+  {
+    id: 'b10', name: 'Southwest Breakfast Bowl', type: 'breakfast',
+    tags: ['savory', 'meal-prep'],
+    calories: 440, protein: 26, carbs: 38, fat: 22, servingWeightG: 350,
+    ingredients: [
+      { name: 'Eggs', qty: 2, unit: 'large' },
+      { name: 'Black beans (drained)', qty: 0.5, unit: 'cup' },
+      { name: 'Corn', qty: 0.5, unit: 'cup' },
+      { name: 'Salsa', qty: 2, unit: 'tbsp' },
+      { name: 'Shredded cheddar', qty: 0.25, unit: 'cup' },
+    ],
+    recipe: 'Scramble eggs. Warm black beans and corn. Layer eggs, beans, and corn in a bowl, top with salsa and cheddar.',
+  },
+  {
+    id: 'b11', name: 'Almond Butter Oat Bowl', type: 'breakfast',
+    tags: ['oats', 'vegetarian', 'meal-prep', 'sweet'],
+    calories: 390, protein: 12, carbs: 52, fat: 14, servingWeightG: 300,
+    ingredients: [
+      { name: 'Rolled oats', qty: 0.5, unit: 'cup' },
+      { name: 'Almond milk', qty: 0.75, unit: 'cup' },
+      { name: 'Almonds (chopped)', qty: 2, unit: 'tbsp' },
+      { name: 'Cherries', qty: 0.5, unit: 'cup' },
+    ],
+    recipe: 'Combine oats and almond milk in a jar, refrigerate overnight. Top with chopped almonds and cherries.',
+  },
+  {
+    id: 'b12', name: 'Ham & Egg Breakfast Wrap', type: 'breakfast',
+    tags: ['eggs', 'savory', 'quick', 'meat'],
+    calories: 410, protein: 30, carbs: 32, fat: 18, servingWeightG: 260,
+    ingredients: [
+      { name: 'Eggs', qty: 2, unit: 'large' },
+      { name: 'Ham (diced)', qty: 2, unit: 'oz' },
+      { name: 'Flour tortilla', qty: 1, unit: 'large', isWrapper: true },
+      { name: 'Shredded cheddar', qty: 0.25, unit: 'cup' },
+    ],
+    recipe: 'Scramble eggs with diced ham. Fill tortilla with eggs and cheddar, roll tightly.',
+  },
+  {
+    id: 'b13', name: 'Greek Yogurt Chia Pudding', type: 'breakfast',
+    tags: ['dairy', 'vegetarian', 'meal-prep', 'sweet'],
+    calories: 340, protein: 26, carbs: 34, fat: 10, servingWeightG: 320,
+    ingredients: [
+      { name: 'Plain Greek yogurt', qty: 1, unit: 'cup' },
+      { name: 'Chia seeds', qty: 2, unit: 'tbsp' },
+      { name: 'Honey', qty: 1, unit: 'tbsp' },
+      { name: 'Strawberries', qty: 0.5, unit: 'cup' },
+    ],
+    recipe: 'Stir chia seeds into yogurt, refrigerate at least 2 hours. Top with honey and strawberries.',
+  },
+  {
+    id: 'b14', name: 'Steak & Eggs', type: 'breakfast',
+    tags: ['meat', 'high-protein', 'low-carb'],
+    calories: 430, protein: 38, carbs: 2, fat: 30, servingWeightG: 260,
+    ingredients: [
+      { name: 'Sirloin steak', qty: 4, unit: 'oz' },
+      { name: 'Eggs', qty: 2, unit: 'large' },
+      { name: 'Olive oil', qty: 1, unit: 'tsp' },
+    ],
+    recipe: 'Sear steak in olive oil 3-4 min per side, rest, slice. Fry eggs to preference. Serve together.',
   },
 
   // ---- LUNCH ----
@@ -157,6 +256,109 @@ export const MEALS = [
       { name: 'Lemon', qty: 0.5, unit: '' },
     ],
     recipe: 'Combine chickpeas, feta, cucumber, and tomatoes. Dress with olive oil and lemon juice.',
+  },
+  {
+    id: 'l7', name: 'Mediterranean Chickpea Bowl', type: 'lunch',
+    tags: ['vegetarian', 'no-cook', 'light'],
+    calories: 430, protein: 18, carbs: 42, fat: 20, servingWeightG: 380,
+    ingredients: [
+      { name: 'Chickpeas (drained)', qty: 1, unit: 'cup' },
+      { name: 'Cucumber', qty: 0.5, unit: '' },
+      { name: 'Cherry tomatoes', qty: 0.5, unit: 'cup' },
+      { name: 'Feta cheese', qty: 0.33, unit: 'cup' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+      { name: 'Lemon', qty: 0.5, unit: '' },
+    ],
+    recipe: 'Combine chickpeas, cucumber, and tomatoes. Dress with olive oil and lemon juice, top with feta.',
+  },
+  {
+    id: 'l8', name: 'BBQ Chicken Wrap', type: 'lunch',
+    tags: ['meat', 'quick', 'savory'],
+    calories: 460, protein: 38, carbs: 38, fat: 14, servingWeightG: 320,
+    ingredients: [
+      { name: 'Chicken breast', qty: 5, unit: 'oz' },
+      { name: 'Whole wheat tortilla', qty: 1, unit: 'large', isWrapper: true },
+      { name: 'BBQ sauce', qty: 2, unit: 'tbsp' },
+      { name: 'Cabbage (shredded)', qty: 0.5, unit: 'cup' },
+    ],
+    recipe: 'Grill and slice chicken, toss with BBQ sauce. Fill tortilla with chicken and shredded cabbage, roll tightly.',
+  },
+  {
+    id: 'l9', name: 'Shrimp & Quinoa Salad', type: 'lunch',
+    tags: ['seafood', 'light', 'meal-prep'],
+    calories: 440, protein: 34, carbs: 40, fat: 14, servingWeightG: 380,
+    ingredients: [
+      { name: 'Shrimp (peeled)', qty: 5, unit: 'oz' },
+      { name: 'Quinoa (dry)', qty: 0.5, unit: 'cup' },
+      { name: 'Bell pepper', qty: 1, unit: '' },
+      { name: 'Lemon', qty: 0.5, unit: '' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Cook quinoa per package. Sauté shrimp 3 min per side. Combine with diced bell pepper, dress with lemon and olive oil.',
+  },
+  {
+    id: 'l10', name: 'Turkey & Hummus Sandwich', type: 'lunch',
+    tags: ['meat', 'quick', 'no-cook'],
+    calories: 400, protein: 30, carbs: 34, fat: 12, servingWeightG: 260,
+    ingredients: [
+      { name: 'Deli turkey', qty: 4, unit: 'oz' },
+      { name: 'Whole wheat bread', qty: 2, unit: 'slices' },
+      { name: 'Hummus', qty: 2, unit: 'tbsp' },
+      { name: 'Spinach', qty: 0.5, unit: 'cup' },
+    ],
+    recipe: 'Spread hummus on bread, layer turkey and spinach. Top with second slice.',
+  },
+  {
+    id: 'l11', name: 'Beef & Broccoli Rice Bowl', type: 'lunch',
+    tags: ['meat', 'meal-prep', 'high-protein'],
+    calories: 520, protein: 40, carbs: 45, fat: 18, servingWeightG: 440,
+    ingredients: [
+      { name: 'Lean ground beef', qty: 5, unit: 'oz' },
+      { name: 'Brown rice (dry)', qty: 0.66, unit: 'cup' },
+      { name: 'Broccoli', qty: 1, unit: 'cup' },
+      { name: 'Soy sauce', qty: 1, unit: 'tbsp' },
+      { name: 'Garlic', qty: 2, unit: 'cloves' },
+    ],
+    recipe: 'Brown beef with garlic. Steam broccoli. Serve over cooked brown rice with a drizzle of soy sauce.',
+  },
+  {
+    id: 'l12', name: 'Caprese Pasta Salad', type: 'lunch',
+    tags: ['vegetarian', 'no-cook', 'light'],
+    calories: 460, protein: 20, carbs: 55, fat: 18, servingWeightG: 380,
+    ingredients: [
+      { name: 'Whole wheat pasta (dry)', qty: 1, unit: 'cup' },
+      { name: 'Mozzarella', qty: 0.33, unit: 'cup' },
+      { name: 'Cherry tomatoes', qty: 1, unit: 'cup' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+      { name: 'Parmesan', qty: 2, unit: 'tbsp' },
+    ],
+    recipe: 'Cook pasta and cool. Toss with mozzarella, tomatoes, olive oil, and parmesan.',
+  },
+  {
+    id: 'l13', name: 'Salmon Poke Bowl', type: 'lunch',
+    tags: ['seafood', 'light', 'high-protein'],
+    calories: 480, protein: 32, carbs: 48, fat: 16, servingWeightG: 400,
+    ingredients: [
+      { name: 'Salmon (sushi-grade)', qty: 5, unit: 'oz' },
+      { name: 'White rice (dry)', qty: 0.5, unit: 'cup' },
+      { name: 'Cucumber', qty: 0.5, unit: '' },
+      { name: 'Edamame (shelled)', qty: 0.5, unit: 'cup' },
+      { name: 'Soy sauce', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Cook rice per package. Dice salmon and cucumber. Top rice with salmon, edamame, and cucumber. Drizzle with soy sauce.',
+  },
+  {
+    id: 'l14', name: 'Lentil & Veggie Wrap', type: 'lunch',
+    tags: ['vegetarian', 'plant-protein', 'meal-prep'],
+    calories: 440, protein: 20, carbs: 50, fat: 16, servingWeightG: 340,
+    ingredients: [
+      { name: 'Lentils (cooked)', qty: 1, unit: 'cup' },
+      { name: 'Whole wheat tortilla', qty: 1, unit: 'large', isWrapper: true },
+      { name: 'Spinach', qty: 1, unit: 'cup' },
+      { name: 'Feta cheese', qty: 0.25, unit: 'cup' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Warm lentils. Fill tortilla with lentils, spinach, and feta. Drizzle with olive oil and roll tightly.',
   },
 
   // ---- DINNER ----
@@ -238,6 +440,105 @@ export const MEALS = [
     ],
     recipe: 'Slice chicken and veggies, toss with seasoning. Sauté 8-10 min until chicken is cooked through. Serve in tortillas.',
   },
+  {
+    id: 'd7', name: 'Pork Tenderloin & Roasted Brussels Sprouts', type: 'dinner',
+    tags: ['meat', 'low-carb', 'high-protein'],
+    calories: 460, protein: 42, carbs: 14, fat: 24, servingWeightG: 380,
+    ingredients: [
+      { name: 'Pork tenderloin', qty: 6, unit: 'oz' },
+      { name: 'Brussels sprouts', qty: 1, unit: 'cup' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+      { name: 'Garlic', qty: 2, unit: 'cloves' },
+    ],
+    recipe: 'Season and roast pork tenderloin at 400°F for 20-25 min. Toss brussels sprouts with olive oil and garlic, roast alongside.',
+  },
+  {
+    id: 'd8', name: 'Bison Burger with Sweet Potato Fries', type: 'dinner',
+    tags: ['meat', 'meal-prep', 'high-protein'],
+    calories: 520, protein: 38, carbs: 42, fat: 20, servingWeightG: 420,
+    ingredients: [
+      { name: 'Ground bison', qty: 5, unit: 'oz' },
+      { name: 'Whole wheat bread', qty: 2, unit: 'slices' },
+      { name: 'Sweet potato', qty: 1, unit: 'medium' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Form and grill a bison patty 4 min per side. Roast sweet potato wedges at 425°F 25 min. Serve patty on bread with sweet potato fries.',
+  },
+  {
+    id: 'd9', name: 'White Fish Tacos', type: 'dinner',
+    tags: ['seafood', 'quick', 'savory'],
+    calories: 440, protein: 34, carbs: 40, fat: 12, servingWeightG: 360,
+    ingredients: [
+      { name: 'White fish', qty: 6, unit: 'oz' },
+      { name: 'Corn tortillas', qty: 3, unit: '' },
+      { name: 'Cabbage (shredded)', qty: 1, unit: 'cup' },
+      { name: 'Lime', qty: 1, unit: '' },
+      { name: 'Salsa', qty: 2, unit: 'tbsp' },
+    ],
+    recipe: 'Season and pan-sear white fish 3-4 min per side, flake. Fill tortillas with fish, cabbage, and salsa, finish with a squeeze of lime.',
+  },
+  {
+    id: 'd10', name: 'Vegetarian Chickpea Curry', type: 'dinner',
+    tags: ['vegetarian', 'plant-protein', 'meal-prep', 'savory'],
+    calories: 480, protein: 18, carbs: 78, fat: 8, servingWeightG: 440,
+    ingredients: [
+      { name: 'Chickpeas (drained)', qty: 1, unit: 'cup' },
+      { name: 'Crushed tomatoes', qty: 1, unit: 'cup' },
+      { name: 'Onion (diced)', qty: 0.5, unit: '' },
+      { name: 'Garlic', qty: 2, unit: 'cloves' },
+      { name: 'White rice (dry)', qty: 0.5, unit: 'cup' },
+    ],
+    recipe: 'Sauté onion and garlic. Add chickpeas and crushed tomatoes, simmer 15 min. Serve over cooked rice.',
+  },
+  {
+    id: 'd11', name: 'Lamb & Couscous', type: 'dinner',
+    tags: ['meat', 'savory', 'meal-prep'],
+    calories: 540, protein: 32, carbs: 46, fat: 26, servingWeightG: 420,
+    ingredients: [
+      { name: 'Ground lamb', qty: 5, unit: 'oz' },
+      { name: 'Couscous (dry)', qty: 0.66, unit: 'cup' },
+      { name: 'Zucchini', qty: 1, unit: '' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Brown lamb in a skillet. Sauté zucchini in olive oil. Cook couscous per package. Combine and serve.',
+  },
+  {
+    id: 'd12', name: 'Baked Cod with Asparagus', type: 'dinner',
+    tags: ['seafood', 'low-carb', 'high-protein'],
+    calories: 380, protein: 38, carbs: 8, fat: 20, servingWeightG: 320,
+    ingredients: [
+      { name: 'White fish', qty: 6, unit: 'oz' },
+      { name: 'Asparagus spears', qty: 8, unit: '' },
+      { name: 'Lemon', qty: 1, unit: '' },
+      { name: 'Olive oil', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Roast white fish and asparagus at 400°F for 15 min with olive oil and lemon.',
+  },
+  {
+    id: 'd13', name: 'Tofu Stir-fry', type: 'dinner',
+    tags: ['vegetarian', 'plant-protein', 'savory'],
+    calories: 460, protein: 24, carbs: 58, fat: 14, servingWeightG: 420,
+    ingredients: [
+      { name: 'Tofu, firm', qty: 6, unit: 'oz' },
+      { name: 'Broccoli', qty: 1, unit: 'cup' },
+      { name: 'Bell pepper', qty: 1, unit: '' },
+      { name: 'Brown rice (dry)', qty: 0.66, unit: 'cup' },
+      { name: 'Soy sauce', qty: 2, unit: 'tbsp' },
+    ],
+    recipe: 'Pan-fry cubed tofu until golden. Add broccoli and bell pepper, stir-fry 4 min. Add soy sauce, serve over rice.',
+  },
+  {
+    id: 'd14', name: 'Meatball Marinara with Pasta', type: 'dinner',
+    tags: ['meat', 'meal-prep', 'savory'],
+    calories: 560, protein: 36, carbs: 62, fat: 18, servingWeightG: 440,
+    ingredients: [
+      { name: 'Lean ground beef', qty: 5, unit: 'oz' },
+      { name: 'Pasta (dry)', qty: 1, unit: 'cup' },
+      { name: 'Marinara sauce', qty: 0.75, unit: 'cup' },
+      { name: 'Parmesan', qty: 2, unit: 'tbsp' },
+    ],
+    recipe: 'Form and brown meatballs. Simmer in marinara sauce 10 min. Cook pasta and serve topped with meatballs, sauce, and parmesan.',
+  },
 
   // ---- SNACKS ----
   {
@@ -299,6 +600,78 @@ export const MEALS = [
     ],
     recipe: 'Dip carrots in hummus. Add celery or bell pepper strips for variety.',
   },
+  {
+    id: 's7', name: 'Turkey Roll-Ups', type: 'snack',
+    tags: ['meat', 'no-cook', 'quick', 'low-carb'],
+    calories: 200, protein: 20, carbs: 4, fat: 12, servingWeightG: 140,
+    ingredients: [
+      { name: 'Deli turkey', qty: 3, unit: 'oz' },
+      { name: 'Cheddar cheese', qty: 1, unit: 'slice' },
+      { name: 'Cucumber', qty: 0.5, unit: '' },
+    ],
+    recipe: 'Roll turkey slices around cheese and cucumber sticks.',
+  },
+  {
+    id: 's8', name: 'Steamed Edamame', type: 'snack',
+    tags: ['vegetarian', 'plant-protein', 'no-cook', 'quick'],
+    calories: 190, protein: 18, carbs: 14, fat: 8, servingWeightG: 160,
+    ingredients: [
+      { name: 'Edamame (shelled)', qty: 1, unit: 'cup' },
+    ],
+    recipe: 'Steam or microwave edamame, sprinkle with a pinch of salt.',
+  },
+  {
+    id: 's9', name: 'Rice Cakes with Peanut Butter', type: 'snack',
+    tags: ['vegetarian', 'quick', 'sweet'],
+    calories: 260, protein: 8, carbs: 32, fat: 12, servingWeightG: 140,
+    ingredients: [
+      { name: 'Rice cakes', qty: 2, unit: '' },
+      { name: 'Peanut butter', qty: 2, unit: 'tbsp' },
+      { name: 'Banana', qty: 0.5, unit: '' },
+    ],
+    recipe: 'Spread peanut butter on rice cakes, top with sliced banana.',
+  },
+  {
+    id: 's10', name: 'Tuna on Crackers', type: 'snack',
+    tags: ['seafood', 'quick', 'high-protein'],
+    calories: 230, protein: 24, carbs: 18, fat: 8, servingWeightG: 140,
+    ingredients: [
+      { name: 'Canned tuna (drained)', qty: 1, unit: 'can' },
+      { name: 'Whole wheat crackers', qty: 10, unit: '' },
+      { name: 'Mayo', qty: 1, unit: 'tbsp' },
+    ],
+    recipe: 'Mix tuna with mayo, spread on crackers.',
+  },
+  {
+    id: 's11', name: 'Mixed Berry Bowl', type: 'snack',
+    tags: ['vegetarian', 'no-cook', 'light', 'sweet'],
+    calories: 110, protein: 1, carbs: 27, fat: 1, servingWeightG: 160,
+    ingredients: [
+      { name: 'Strawberries', qty: 0.5, unit: 'cup' },
+      { name: 'Blueberries', qty: 0.5, unit: 'cup' },
+      { name: 'Honey', qty: 1, unit: 'tsp' },
+    ],
+    recipe: 'Combine berries in a bowl, drizzle with honey.',
+  },
+  {
+    id: 's12', name: 'Cheese & Almonds', type: 'snack',
+    tags: ['dairy', 'low-carb', 'quick'],
+    calories: 270, protein: 13, carbs: 6, fat: 22, servingWeightG: 80,
+    ingredients: [
+      { name: 'Cheddar cheese', qty: 1, unit: 'slice' },
+      { name: 'Almonds', qty: 0.25, unit: 'cup' },
+    ],
+    recipe: 'Pair cheese slices with a small handful of almonds.',
+  },
 ]
+
+// The full meal database is the hand-written set (54 meals — realistic,
+// hand-tuned recipes across every meal type and dietary tag) PLUS a large
+// procedurally generated set (comboGenerator.js — ~99 more meals built by
+// crossing proteins/carbs/veggies/fruits through real cooking templates with
+// computed macros). Together this gives the planner and "regenerate" a wide
+// enough pool to actually feel varied instead of cycling through the same
+// handful of options.
+export const MEALS = [...HAND_WRITTEN_MEALS, ...generateComboMeals()]
 
 export const ALL_TAGS = [...new Set(MEALS.flatMap(m => m.tags))].sort()

@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useState, lazy } from 'react'
-import { matchPantryToMeals, formatIngredient } from '../lib/mealPlanner.js'
+import { matchPantryToMeals, suggestPantryCombo, formatIngredient } from '../lib/mealPlanner.js'
 import { CHAINS, findStoreOptions } from '../data/storeSnacks.js'
 import { searchIngredients } from '../lib/recipeBuilder.js'
 import { searchBrandedFoods, getProductByBarcode } from '../lib/openFoodFacts.js'
@@ -122,6 +122,8 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
   const [pantryText, setPantryText] = useState(savedPantry.join('\n'))
   const [type, setType] = useState('any')
   const [results, setResults] = useState(null)
+  const [combo, setCombo] = useState(null)
+  const [searched, setSearched] = useState(false)
 
   function addItemName(name) {
     const nextText = pantryText.trim() ? `${pantryText.trim()}\n${name}` : name
@@ -133,6 +135,8 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
     const items = pantryText.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
     onSavePantry(items)
     setResults(matchPantryToMeals(pantryText, { type, personSettings }))
+    setCombo(suggestPantryCombo(pantryText))
+    setSearched(true)
   }
 
   return (
@@ -167,19 +171,43 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
         <button className="primary" onClick={handleFind}>Find meals I can make</button>
       </div>
 
-      {results && results.length === 0 && (
+      {combo && !combo.isPartial && (
+        <div className="card" style={{ borderColor: 'var(--fuel)', borderWidth: 1.5 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <h2 style={{ marginBottom: 0, fontSize: 13, color: 'var(--fuel)' }}>Built from what you have</h2>
+          </div>
+          <p className="meal-name" style={{ fontSize: 17, marginBottom: 6 }}>{combo.name}</p>
+          <p className="mono small" style={{ marginBottom: 10 }}>
+            {combo.calories} kcal · P{combo.protein}g · C{combo.carbs}g · F{combo.fat}g per serving
+          </p>
+          <p className="meal-detail" style={{ marginBottom: 10 }}>{combo.recipe}</p>
+          <p className="small" style={{ marginBottom: 10 }}>
+            <strong>Uses:</strong> {combo.ingredients.map(formatIngredient).join(', ')}
+          </p>
+          <button className="secondary" onClick={() => onLogMeal(combo)}>Log this meal</button>
+        </div>
+      )}
+
+      {combo && combo.isPartial && (
+        <div className="card" style={{ background: 'var(--surface-2)' }}>
+          <h2 style={{ fontSize: 13 }}>Almost there</h2>
+          <p className="meal-detail">{combo.recipe}</p>
+        </div>
+      )}
+
+      {searched && results && results.length === 0 && !combo && (
         <div className="empty-state">
           <h3>No matches</h3>
           <p className="small">Try adding a few more staples — even "rice" or "eggs" unlocks several meals.</p>
         </div>
       )}
 
-      {results && results.map(({ meal, matched, missing, matchPct }) => (
+      {results && results.map(({ meal, matched, missing, missingCount }) => (
         <div className="card" key={meal.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
             <h2 style={{ marginBottom: 0, fontSize: 16, color: 'var(--text)', textTransform: 'none', letterSpacing: 0 }}>{meal.name}</h2>
-            <span className="mono small" style={{ color: matchPct === 1 ? 'var(--fuel)' : 'var(--muted)' }}>
-              {matched.length}/{meal.ingredients.length} on hand
+            <span className="mono small" style={{ color: missingCount === 0 ? 'var(--fuel)' : 'var(--muted)' }}>
+              {missingCount === 0 ? 'You have this ✓' : `Just grab: ${missing.length}`}
             </span>
           </div>
           <p className="meal-type" style={{ marginBottom: 10 }}>{meal.type}</p>
@@ -189,7 +217,7 @@ function KitchenMode({ savedPantry, onSavePantry, onLogMeal, remainingTargets, p
 
           {missing.length > 0 && (
             <p className="small" style={{ marginBottom: 10 }}>
-              <strong>Missing:</strong> {missing.map(formatIngredient).join(', ')}
+              <strong>Just grab:</strong> {missing.map(formatIngredient).join(', ')}
             </p>
           )}
 

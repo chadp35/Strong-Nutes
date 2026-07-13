@@ -26,6 +26,7 @@ export const INGREDIENTS = [
   { id: 'egg-white', name: 'Egg white (raw)', category: 'protein', per100g: { calories: 52, protein: 10.9, carbs: 0.7, fat: 0.2 }, unitGrams: { each: 33 } },
   { id: 'ground-lamb', name: 'Ground lamb (raw)', category: 'protein', per100g: { calories: 282, protein: 16.6, carbs: 0, fat: 23.4 } },
   { id: 'ground-bison', name: 'Ground bison (raw)', category: 'protein', per100g: { calories: 143, protein: 21, carbs: 0, fat: 6 } },
+  { id: 'ham', name: 'Ham', category: 'protein', per100g: { calories: 145, protein: 18, carbs: 1.5, fat: 6 } },
 
   // ---- Seafood ----
   { id: 'white-fish', name: 'White fish — cod/tilapia/mahi/haddock (raw)', category: 'seafood', per100g: { calories: 90, protein: 19.5, carbs: 0, fat: 1 } },
@@ -85,6 +86,7 @@ export const INGREDIENTS = [
   { id: 'cucumber', name: 'Cucumber', category: 'vegetable', per100g: { calories: 15, protein: 0.7, carbs: 3.6, fat: 0.1 }, unitGrams: { each: 300 } },
   { id: 'carrot', name: 'Carrot', category: 'vegetable', per100g: { calories: 41, protein: 0.9, carbs: 9.6, fat: 0.2 }, unitGrams: { each: 60 } },
   { id: 'green-beans', name: 'Green beans', category: 'vegetable', per100g: { calories: 31, protein: 1.8, carbs: 7, fat: 0.2 }, unitGrams: { cup: 100 } },
+  { id: 'corn', name: 'Corn', category: 'vegetable', per100g: { calories: 86, protein: 3.2, carbs: 19, fat: 1.2 }, unitGrams: { cup: 145 } },
 
   // ---- Fruits ----
   { id: 'strawberries', name: 'Strawberries', category: 'fruit', per100g: { calories: 32, protein: 0.7, carbs: 7.7, fat: 0.3 }, unitGrams: { cup: 152 } },
@@ -131,4 +133,9 @@ export const INGREDIENTS = [
   { id: 'maple-syrup', name: 'Maple syrup', category: 'condiment', per100g: { calories: 260, protein: 0, carbs: 67, fat: 0.2 }, unitGrams: { tbsp: 20, tsp: 6.7 } },
   { id: 'soy-sauce', name: 'Soy sauce', category: 'condiment', per100g: { calories: 53, protein: 8, carbs: 4.9, fat: 0.6 }, unitGrams: { tbsp: 16, tsp: 5.3 } },
   { id: 'salsa', name: 'Salsa', category: 'condiment', per100g: { calories: 36, protein: 1.6, carbs: 7.6, fat: 0.2 }, unitGrams: { tbsp: 16, tsp: 5.3 } },
+  { id: 'crushed-tomatoes', name: 'Crushed tomatoes', category: 'condiment', per100g: { calories: 32, protein: 1.6, carbs: 7, fat: 0.3 }, unitGrams: { cup: 245, tbsp: 15 } },
+  { id: 'marinara-sauce', name: 'Marinara sauce', category: 'condiment', per100g: { calories: 32, protein: 1.3, carbs: 6, fat: 0.6 }, unitGrams: { cup: 250, tbsp: 16 } },
+  { id: 'bbq-sauce', name: 'BBQ sauce', category: 'condiment', per100g: { calories: 172, protein: 0.5, carbs: 40, fat: 0.5 }, unitGrams: { tbsp: 17, tsp: 5.7 } },
+  { id: 'vegetable-broth', name: 'Vegetable broth', category: 'condiment', per100g: { calories: 3, protein: 0.3, carbs: 0.5, fat: 0.1 }, unitGrams: { cup: 240 } },
+  { id: 'beef-broth', name: 'Beef broth', category: 'condiment', per100g: { calories: 4, protein: 0.6, carbs: 0.3, fat: 0.1 }, unitGrams: { cup: 240 } },
 ]

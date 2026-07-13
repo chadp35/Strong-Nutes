@@ -14,6 +14,7 @@ import { generatePlan, generateShoppingList, regenerateDayMeal, swapDayMeal, rem
 import { calculateTargets } from './lib/calculations.js'
 import { amICoach } from './lib/coaching.js'
 import { useOnlineStatus } from './lib/useOnlineStatus.js'
+import { useTodayKey } from './lib/useTodayKey.js'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -27,6 +28,10 @@ export default function App() {
   const [synced, setSynced] = useState(true)
   const isOnline = useOnlineStatus()
   const saveTimer = useRef(null)
+  // Reactive "today" — re-renders the Today tab automatically at midnight
+  // (and when the tab regains focus/visibility) instead of freezing on
+  // whatever day it was when the app first loaded.
+  const today = useTodayKey()
 
   // Track auth session
   useEffect(() => {
@@ -81,12 +86,12 @@ export default function App() {
   }
 
   function handleAddEntry(entry) {
-    const key = todayKey()
+    const key = today
     setState(s => ({ ...s, log: { ...s.log, [key]: [...(s.log[key] || []), entry] } }))
   }
 
   function handleRemoveEntry(id) {
-    const key = todayKey()
+    const key = today
     setState(s => ({ ...s, log: { ...s.log, [key]: (s.log[key] || []).filter(e => e.id !== id) } }))
   }
 
@@ -273,7 +278,7 @@ export default function App() {
   }
 
   function handleChangeWater(delta) {
-    const key = todayKey()
+    const key = today
     setState(s => {
       const current = s.water[key] || 0
       const next = Math.max(0, current + delta)
@@ -345,13 +350,13 @@ export default function App() {
     return <Onboarding onComplete={handleOnboardingComplete} />
   }
 
-  const todaysEntries = state.log[todayKey()] || []
+  const todaysEntries = state.log[today] || []
   // Today's plan card should reflect whichever plan day is actually today's
   // calendar date — not always array index 0, which used to mean "today's
   // meals" silently kept showing Day 1 forever, even after Day 1's date had
   // passed. Plans saved before per-day dates existed fall back to index 0.
   const hasDatedDays = !!state.plan?.[0]?.date
-  const todaysPlanDay = state.plan ? (hasDatedDays ? state.plan.find(d => d.date === todayKey()) : state.plan[0]) : null
+  const todaysPlanDay = state.plan ? (hasDatedDays ? state.plan.find(d => d.date === today) : state.plan[0]) : null
   const todaysPlanMeals = todaysPlanDay?.meals || null
   const shoppingList = state.plan ? generateShoppingList(state.plan) : []
   const personSettings = buildPersonSettings(state)
@@ -400,7 +405,7 @@ export default function App() {
           customFoods={state.customFoods}
           onSaveCustomFood={handleSaveCustomFood}
           onDeleteCustomFood={handleDeleteCustomFood}
-          todaysWater={state.water[todayKey()] || 0}
+          todaysWater={state.water[today] || 0}
           onChangeWater={handleChangeWater}
           customRecipes={state.customRecipes}
           discoveredProducts={state.discoveredProducts}

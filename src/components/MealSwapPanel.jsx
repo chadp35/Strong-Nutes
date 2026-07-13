@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { browseMeals, matchPantryToMeals } from '../lib/mealPlanner.js'
+import { browseMeals, matchPantryToMeals, suggestPantryCombo } from '../lib/mealPlanner.js'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
 import { searchLocalProducts } from '../lib/localProductSearch.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
@@ -103,9 +103,11 @@ function RecipesList({ customRecipes, onPick }) {
 function PantryMatch({ mealType, excludeIds, personSettings, savedPantry, onPick }) {
   const [pantryText, setPantryText] = useState((savedPantry || []).join('\n'))
   const [results, setResults] = useState(null)
+  const [combo, setCombo] = useState(null)
 
   function find() {
     setResults(matchPantryToMeals(pantryText, { type: mealType, excludeIds, personSettings }))
+    setCombo(suggestPantryCombo(pantryText))
   }
 
   return (
@@ -130,7 +132,17 @@ function PantryMatch({ mealType, excludeIds, personSettings, savedPantry, onPick
       </div>
       <button className="secondary" style={{ marginBottom: 10 }} onClick={find}>Find a match</button>
 
-      {results && results.length === 0 && (
+      {combo && !combo.isPartial && (
+        <div className="meal-row" style={{ cursor: 'pointer', background: 'var(--surface)', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }} onClick={() => onPick(combo)}>
+          <div>
+            <div className="meal-name">✨ {combo.name}</div>
+            <div className="meal-type">Built from what you have</div>
+          </div>
+          <span className="meal-macros">{combo.calories} kcal</span>
+        </div>
+      )}
+
+      {results && results.length === 0 && !combo && (
         <p className="muted small">No matches for that — try adding a staple or two, or use Browse / Web Search instead.</p>
       )}
       {results && results.map(({ meal, matched }) => (
