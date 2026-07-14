@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { calculateTargets, lbsToKg, ftInToCm, ACTIVITY_MULTIPLIERS, GOALS, EATING_STYLES } from '../lib/calculations.js'
+import { calculateTargets, lbsToKg, ftInToCm, ACTIVITY_MULTIPLIERS, GOALS, EATING_STYLES, DIETING_CONFIDENCE, BODY_FAT_BANDS } from '../lib/calculations.js'
 import { ALLERGEN_OPTIONS, DIETARY_FRAMEWORK_OPTIONS } from '../data/allergens.js'
 import { localDateKey } from '../lib/dateKey.js'
 import GoalPlanner from './GoalPlanner.jsx'
 
 const PLACEHOLDER = { weightLbs: 170, feet: 5, inches: 8, age: 30 }
-const TOTAL_STEPS = 9
+const TOTAL_STEPS = 12
 
 const PROTEIN_ITEMS = ['Chicken breast', 'Chicken thighs', 'Turkey', 'Lean beef', 'Pork', 'Whole eggs', 'Egg whites', 'Lamb', 'Bison']
 const SEAFOOD_ITEMS = ['White fish', 'Salmon', 'Tuna', 'Shrimp', 'Crab', 'Lobster', 'Mussels', 'Clams', 'Oysters']
@@ -97,7 +97,13 @@ export default function Onboarding({ onComplete }) {
     return calculateTargets({ sex, weightKg: lbsToKg(w), heightCm: ftInToCm(f, i), age: a, activityKey, goalKey })
   }, [sex, weightLbs, feet, inches, age, activityKey, goalKey])
 
-  // ---- Step 1: timed goal ----
+  // ---- Steps 1-3: dieting confidence, weight-loss drug use, body fat — all
+  // feed into the goal-plan recommendation right after them ----
+  const [dietingConfidence, setDietingConfidence] = useState('moderate')
+  const [weightLossDrugUse, setWeightLossDrugUse] = useState('no')
+  const [bodyFatBand, setBodyFatBand] = useState('')
+
+  // ---- Step 4: timed goal ----
   const [goalPlanResult, setGoalPlanResult] = useState(null)
 
   // ---- Step 2: safety ----
@@ -151,7 +157,7 @@ export default function Onboarding({ onComplete }) {
   function handleSubmit() {
     const weightKg = lbsToKg(Number(weightLbs))
     const heightCm = ftInToCm(Number(feet), Number(inches || 0))
-    const baseTargets = calculateTargets({ sex, weightKg, heightCm, age: Number(age), activityKey, goalKey, eatingStyle })
+    const baseTargets = calculateTargets({ sex, weightKg, heightCm, age: Number(age), activityKey, goalKey, eatingStyle, bodyFatBand })
 
     let targets = baseTargets
     let goalPlan = null
@@ -182,6 +188,7 @@ export default function Onboarding({ onComplete }) {
 
     onComplete({
       sex, weightKg, heightCm, age: Number(age), activityKey, goalKey, eatingStyle,
+      dietingConfidence, weightLossDrugUse, bodyFatBand,
       likedTags: [], dislikedTags: [],
       likedIngredients, dislikedIngredients: finalDislikedIngredients,
       allergies, dietaryFramework,
@@ -268,10 +275,84 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 1: TIMED GOAL =================
+  // ================= STEP 1: PAST DIETING CONFIDENCE =================
   if (step === 1) {
     return (
-      <StepShell step={step} title="Want a timed goal?" subtitle="Optional — lose or gain a specific amount by a specific date." onBack={back} onNext={next} showSkip={!goalPlanResult}>
+      <StepShell step={step} title="Past dieting effectiveness" subtitle="How confident are you in being able to successfully diet to reach a specific goal?" onBack={back} onNext={next}>
+        <div className="card">
+          {Object.entries(DIETING_CONFIDENCE).map(([key, v]) => (
+            <div
+              key={key}
+              className={`tag-chip ${dietingConfidence === key ? 'like' : ''}`}
+              style={{ display: 'block', marginBottom: 8, borderRadius: 10, padding: '10px 14px' }}
+              onClick={() => setDietingConfidence(key)}
+            >
+              <strong>{v.label}</strong>
+              <div className="muted small">{v.blurb}</div>
+            </div>
+          ))}
+        </div>
+        <p className="muted small">
+          Just used to suggest a sensible starting pace for your plan — you can always pick something different.
+        </p>
+      </StepShell>
+    )
+  }
+
+  // ================= STEP 2: WEIGHT LOSS DRUGS =================
+  if (step === 2) {
+    return (
+      <StepShell step={step} title="Weight loss medication" subtitle="Are you currently using, or planning to use, a weight-loss medication (semaglutide/Ozempic/Wegovy, tirzepatide/Zepbound/Mounjaro, etc.)? If you're not sure, choose No." onBack={back} onNext={next}>
+        <div className="card">
+          {[{ key: 'yes', label: 'Yes' }, { key: 'no', label: 'No' }].map(o => (
+            <div
+              key={o.key}
+              className={`tag-chip ${weightLossDrugUse === o.key ? 'like' : ''}`}
+              style={{ display: 'block', marginBottom: 8, borderRadius: 10, padding: '10px 14px' }}
+              onClick={() => setWeightLossDrugUse(o.key)}
+            >
+              {o.label}
+            </div>
+          ))}
+        </div>
+        <p className="muted small">
+          Not medical advice, and this app doesn't replace your prescriber — just used so a recommended pace doesn't stack a large extra deficit on top of appetite suppression, and to lean a little more on protein.
+        </p>
+      </StepShell>
+    )
+  }
+
+  // ================= STEP 3: BODY FAT % =================
+  if (step === 3) {
+    return (
+      <StepShell step={step} title="What's your body fat percentage?" subtitle="A rough estimate is fine — this isn't a diagnosis, just context for your protein target and a safe pace." onBack={back} onNext={next} showSkip>
+        <div className="card">
+          {Object.entries(BODY_FAT_BANDS).filter(([key]) => key !== 'notSure').map(([key, v]) => (
+            <div
+              key={key}
+              className={`tag-chip ${bodyFatBand === key ? 'like' : ''}`}
+              style={{ display: 'block', marginBottom: 8, borderRadius: 10, padding: '10px 14px' }}
+              onClick={() => setBodyFatBand(key)}
+            >
+              {v.label}
+            </div>
+          ))}
+          <div
+            className={`tag-chip ${bodyFatBand === 'notSure' ? 'like' : ''}`}
+            style={{ display: 'block', borderRadius: 10, padding: '10px 14px' }}
+            onClick={() => setBodyFatBand('notSure')}
+          >
+            Not sure
+          </div>
+        </div>
+      </StepShell>
+    )
+  }
+
+  // ================= STEP 4: TIMED GOAL =================
+  if (step === 4) {
+    return (
+      <StepShell step={step} title="Want a timed goal?" subtitle="Optional — lose or gain a specific amount by a specific date. We'll suggest a pace based on what you just told us." onBack={back} onNext={next} showSkip={!goalPlanResult}>
         <div className="card">
           {!goalPlanResult && (
             <GoalPlanner
@@ -279,6 +360,9 @@ export default function Onboarding({ onComplete }) {
               weightKg={lbsToKg(Number(weightLbs))}
               bmr={liveTargets.bmr}
               tdee={liveTargets.tdee}
+              confidenceKey={dietingConfidence}
+              weightLossDrugUse={weightLossDrugUse}
+              bodyFatBand={bodyFatBand}
               onStart={setGoalPlanResult}
               onSkip={next}
             />
@@ -297,8 +381,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 2: SAFETY =================
-  if (step === 2) {
+  // ================= STEP 5: SAFETY =================
+  if (step === 5) {
     return (
       <StepShell step={step} title="Allergies & dietary framework" subtitle="This is the most important step — these are hard excludes everywhere the app suggests food." onBack={back} onNext={next}>
         <div className="card">
@@ -326,8 +410,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 3: EATING STYLE =================
-  if (step === 3) {
+  // ================= STEP 6: EATING STYLE =================
+  if (step === 6) {
     return (
       <StepShell step={step} title="Eating style" subtitle="A style you've felt best doing before, if any." onBack={back} onNext={next}>
         <div className="card">
@@ -346,8 +430,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 4: FOOD PREFERENCES =================
-  if (step === 4) {
+  // ================= STEP 7: FOOD PREFERENCES =================
+  if (step === 7) {
     return (
       <StepShell step={step} title="Foods you like &amp; avoid" subtitle="Tap once to like (green), tap again to mark as a deal-breaker (red)." onBack={back} onNext={next}>
         <div className="card">
@@ -363,8 +447,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 5: TEXTURE & FLAVOR =================
-  if (step === 5) {
+  // ================= STEP 8: TEXTURE & FLAVOR =================
+  if (step === 8) {
     return (
       <StepShell step={step} title="Texture &amp; flavor" onBack={back} onNext={next}>
         <div className="card">
@@ -411,8 +495,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 6: LIFESTYLE & KITCHEN =================
-  if (step === 6) {
+  // ================= STEP 9: LIFESTYLE & KITCHEN =================
+  if (step === 9) {
     return (
       <StepShell step={step} title="Kitchen &amp; lifestyle" onBack={back} onNext={next}>
         <div className="card">
@@ -457,8 +541,8 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 7: BEVERAGES & NON-NEGOTIABLE =================
-  if (step === 7) {
+  // ================= STEP 10: BEVERAGES & NON-NEGOTIABLE =================
+  if (step === 10) {
     return (
       <StepShell step={step} title="Beverages &amp; your non-negotiable" subtitle="Informational — helps give context, not used to auto-restrict anything." onBack={back} onNext={next}>
         <div className="card">
@@ -490,7 +574,7 @@ export default function Onboarding({ onComplete }) {
     )
   }
 
-  // ================= STEP 8: REVIEW =================
+  // ================= STEP 11: REVIEW =================
   const finalCalories = goalPlanResult ? goalPlanResult.preview.calories : liveTargets.calories
   return (
     <div className="app-shell" style={{ paddingTop: 20 }}>
@@ -499,8 +583,15 @@ export default function Onboarding({ onComplete }) {
 
       <div className="card" style={{ borderColor: 'var(--fuel)' }}>
         <p className="odometer" style={{ fontSize: 34, color: 'var(--fuel)', marginBottom: 8 }}>{finalCalories} <span className="odometer-unit">kcal/day</span></p>
+        {goalPlanResult && (
+          <p className="small">
+            Goal: {goalPlanResult.goalPlanCore.type === 'lose' ? 'Lose' : 'Gain'} {goalPlanResult.goalPlanCore.targetChangeLbs} lbs over {goalPlanResult.goalPlanCore.weeks} weeks
+          </p>
+        )}
         {allergies.length > 0 && <p className="small" style={{ color: 'var(--danger)' }}>Allergies excluded: {allergies.map(k => ALLERGEN_OPTIONS.find(a => a.key === k)?.label).join(', ')}</p>}
         {dietaryFramework !== 'none' && <p className="small">Framework: {DIETARY_FRAMEWORK_OPTIONS.find(d => d.key === dietaryFramework)?.label}</p>}
+        {weightLossDrugUse === 'yes' && <p className="small">Using a weight-loss medication</p>}
+        {bodyFatBand && bodyFatBand !== 'notSure' && <p className="small">Body fat: {BODY_FAT_BANDS[bodyFatBand]?.label}</p>}
         <p className="small" style={{ marginBottom: 0 }}>
           {likedIngredients.length} liked foods · {dislikedIngredients.length} avoided
         </p>

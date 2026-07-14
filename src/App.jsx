@@ -364,6 +364,7 @@ export default function App() {
         activityKey: s.profile.activityKey,
         goalKey: s.profile.goalKey,
         eatingStyle: s.profile.eatingStyle,
+        bodyFatBand: s.profile.bodyFatBand,
       })
       const newProfile = { ...s.profile, goalPlan: null, targets }
       const newPlan = s.plan ? generatePlan({ targets, personSettings: buildPersonSettings({ ...s, profile: newProfile }), days: s.plan.length }) : s.plan

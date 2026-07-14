@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { GOALS, ACTIVITY_MULTIPLIERS, EATING_STYLES, kgToLbs } from '../lib/calculations.js'
+import { GOALS, ACTIVITY_MULTIPLIERS, EATING_STYLES, BODY_FAT_BANDS, DIETING_CONFIDENCE, kgToLbs } from '../lib/calculations.js'
 import { exportAllDataJSON } from '../lib/exportData.js'
 import { listCoaches } from '../lib/coaching.js'
 import { submitFeedback } from '../lib/feedback.js'
@@ -215,7 +215,20 @@ export default function SettingsTab({
         <p className="small" style={{ marginBottom: 4 }}>Age: <span className="mono">{profile.age}</span></p>
         <p className="small" style={{ marginBottom: 4 }}>Activity: {ACTIVITY_MULTIPLIERS[profile.activityKey].label}</p>
         <p className="small" style={{ marginBottom: 4 }}>Goal: {GOALS[profile.goalKey].label}</p>
-        <p className="small" style={{ marginBottom: 0 }}>Eating style: {EATING_STYLES[profile.eatingStyle || 'balanced']?.label}</p>
+        <p className="small" style={{ marginBottom: profile.bodyFatBand || profile.dietingConfidence || profile.weightLossDrugUse === 'yes' ? 4 : 0 }}>
+          Eating style: {EATING_STYLES[profile.eatingStyle || 'balanced']?.label}
+        </p>
+        {profile.bodyFatBand && profile.bodyFatBand !== 'notSure' && (
+          <p className="small" style={{ marginBottom: 4 }}>Body fat: {BODY_FAT_BANDS[profile.bodyFatBand]?.label}</p>
+        )}
+        {profile.dietingConfidence && (
+          <p className="small" style={{ marginBottom: profile.weightLossDrugUse === 'yes' ? 4 : 0 }}>
+            Past-diet confidence: {DIETING_CONFIDENCE[profile.dietingConfidence]?.label}
+          </p>
+        )}
+        {profile.weightLossDrugUse === 'yes' && (
+          <p className="small" style={{ marginBottom: 0 }}>Using a weight-loss medication</p>
+        )}
       </div>
 
       <div className="card">
@@ -236,6 +249,9 @@ export default function SettingsTab({
           bmr={profile.targets.bmr}
           tdee={profile.targets.tdee}
           activePlan={profile.goalPlan}
+          confidenceKey={profile.dietingConfidence}
+          weightLossDrugUse={profile.weightLossDrugUse}
+          bodyFatBand={profile.bodyFatBand}
           onStart={onStartGoalPlan}
           onStop={onStopGoalPlan}
         />

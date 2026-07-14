@@ -34,6 +34,28 @@ export const EATING_STYLES = {
   none: { label: 'No preference — design what fits my goals', fatPct: 0.28, proteinBonusPerKg: 0 },
 }
 
+// Estimated body fat band, collected once in onboarding. Leaner people carry
+// less spare energy/protein reserve, so they need relatively more protein
+// per kg to hold onto muscle during a cut, and a slower pace is safer for
+// them; someone with more to lose can safely move a bit faster. Not a
+// diagnosis — a self-reported band used only to nudge these two numbers.
+export const BODY_FAT_BANDS = {
+  under15: { label: 'Less than 15%', proteinBonusPerKg: 0.3, paceCapPctPerWeek: 0.0075 },
+  '15to22': { label: '15–22%', proteinBonusPerKg: 0.15, paceCapPctPerWeek: 0.01 },
+  '22to30': { label: '22–30%', proteinBonusPerKg: 0, paceCapPctPerWeek: 0.0125 },
+  over30: { label: 'Greater than 30%', proteinBonusPerKg: 0, paceCapPctPerWeek: 0.015 },
+  notSure: { label: "Not sure", proteinBonusPerKg: 0, paceCapPctPerWeek: 0.01 },
+}
+
+// Self-rated track record with past diets — used only to pick a sensible
+// default pace (not to gatekeep anything; someone can always choose a
+// faster or slower option themselves).
+export const DIETING_CONFIDENCE = {
+  low: { label: 'Not very confident', blurb: "Never successfully dieted, not sure what worked" },
+  moderate: { label: 'Moderately confident', blurb: "Gotten results before but hasn't stuck long-term" },
+  high: { label: 'Extremely confident', blurb: 'Successfully dieted before and kept results off' },
+}
+
 // Splits a calorie total into protein/carbs/fat grams. Protein is set by
 // bodyweight (higher for a cut to protect muscle, plus an eating-style
 // bonus), fat set by eating style, carbs fill whatever's left. Shared by the
@@ -49,15 +71,44 @@ function macroSplitForCalories(calories, weightKg, proteinPerKg, fatPct = 0.28) 
   return { protein, carbs, fat }
 }
 
-// Returns { calories, protein, carbs, fat } in grams (calories in kcal)
-export function calculateTargets({ sex, weightKg, heightCm, age, activityKey, goalKey, eatingStyle = 'balanced' }) {
+// Returns { calories, protein, carbs, fat } in grams (calories in kcal).
+// bodyFatBand is optional — when given, its protein bonus stacks with the
+// goal's and eating style's, same as everywhere else this math is used.
+export function calculateTargets({ sex, weightKg, heightCm, age, activityKey, goalKey, eatingStyle = 'balanced', bodyFatBand }) {
   const bmr = calculateBMR({ sex, weightKg, heightCm, age })
   const tdee = calculateTDEE(bmr, activityKey)
   const goal = GOALS[goalKey]
   const style = EATING_STYLES[eatingStyle] || EATING_STYLES.balanced
+  const bodyFatBonus = BODY_FAT_BANDS[bodyFatBand]?.proteinBonusPerKg || 0
   const calories = Math.round(tdee * (1 + goal.calorieAdjust))
-  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, goal.proteinPerKg + style.proteinBonusPerKg, style.fatPct)
+  const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, goal.proteinPerKg + style.proteinBonusPerKg + bodyFatBonus, style.fatPct)
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), calories, protein, carbs, fat }
+}
+
+// Picks a sensible default goal-plan tier ('gradual' or 'moderate' — never
+// auto-recommends 'aggressive', that stays a manual/Custom choice only) from
+// the onboarding context, plus an optional heads-up note to show alongside
+// it. Being on a weight-loss medication or having low past-diet confidence
+// both push toward the gentler default; this never blocks picking a faster
+// pace manually, it just changes what's pre-selected and starred.
+export function recommendGoalPlanApproach({ confidenceKey, weightLossDrugUse, bodyFatBand }) {
+  const notes = []
+  let recommendedTierKey = 'moderate'
+
+  if (weightLossDrugUse === 'yes') {
+    recommendedTierKey = 'gradual'
+    notes.push("Since you're on a weight-loss medication, we're starting gentle and leaning on protein rather than stacking a big extra deficit on top of appetite suppression — talk to your prescriber about your nutrition plan.")
+  }
+  if (confidenceKey === 'low') {
+    recommendedTierKey = 'gradual'
+    notes.push("Starting gradual tends to be more sustainable if past diets haven't stuck — it's easier to speed up later than to recover from burning out early.")
+  }
+  if (bodyFatBand === 'under15') {
+    recommendedTierKey = 'gradual'
+    notes.push("At your leaner body fat range, a slower pace protects muscle better — there's less spare energy to pull from.")
+  }
+
+  return { recommendedTierKey, note: notes[0] || null }
 }
 
 // ---------- Timed goal plans (lose/gain N lbs in N weeks) ----------
@@ -99,7 +150,7 @@ export function suggestGoalTimeframes({ type, targetChangeLbs, weightLbs }) {
 // timeframe. Includes a "wiggle room" buffer — since what actually matters is
 // the weekly average, not hitting one exact number every single day — and
 // flags whether the resulting pace is more aggressive than generally advised.
-export function buildGoalPlanTargets({ type, targetChangeLbs, weeks, bmr, tdee, weightKg, weightLbs }) {
+export function buildGoalPlanTargets({ type, targetChangeLbs, weeks, bmr, tdee, weightKg, weightLbs, bodyFatBand }) {
   const days = Math.max(weeks, 1) * 7
   const totalCalorieChange = targetChangeLbs * KCAL_PER_LB
   const dailyChangeMagnitude = Math.round(totalCalorieChange / days)
@@ -107,14 +158,21 @@ export function buildGoalPlanTargets({ type, targetChangeLbs, weeks, bmr, tdee, 
 
   // Hard floor so the math never recommends something unsafe regardless of input
   const calories = Math.max(Math.round(tdee + dailyCalorieChange), 1200)
-  const proteinPerKg = type === 'lose' ? 2.0 : 1.8
+  const bodyFatBonus = BODY_FAT_BANDS[bodyFatBand]?.proteinBonusPerKg || 0
+  const proteinPerKg = (type === 'lose' ? 2.0 : 1.8) + bodyFatBonus
   const { protein, carbs, fat } = macroSplitForCalories(calories, weightKg, proteinPerKg)
 
   const wiggleRoom = Math.min(Math.max(Math.round(dailyChangeMagnitude * 0.25), 75), 250)
 
   const weeklyRateLbs = (dailyChangeMagnitude * 7) / KCAL_PER_LB
   const weeklyRatePct = (weeklyRateLbs / weightLbs) * 100
-  const isAggressive = type === 'lose' ? weeklyRatePct > 1 : weeklyRatePct > 0.6
+  // Leaner bodies have a lower safe ceiling — use whichever threshold is
+  // more conservative between the generic one and the band's cap.
+  const paceCapPct = type === 'lose' && BODY_FAT_BANDS[bodyFatBand]
+    ? BODY_FAT_BANDS[bodyFatBand].paceCapPctPerWeek * 100
+    : null
+  const genericCapPct = type === 'lose' ? 1 : 0.6
+  const isAggressive = weeklyRatePct > (paceCapPct != null ? Math.min(paceCapPct, genericCapPct) : genericCapPct)
 
   return {
     bmr: Math.round(bmr),
