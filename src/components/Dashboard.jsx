@@ -174,24 +174,64 @@ export default function Dashboard({
 
 const MEAL_SLOT_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }
 
-// One row in the Today tab's log — tap to expand a portion slider that
+// One row in the Today tab's log — tap to expand a portion adjuster that
 // rescales calories/protein/carbs/fat against the entry's original logged
 // amount (its base* snapshot), so it's never a one-shot "locked in" number.
+// When the entry knows its own weight (servingWeightG — true for plan meals,
+// pantry recipes/combos, and anything logged via a gram amount in Search),
+// this adjusts by actual grams instead of an abstract percentage, since
+// "I ate about 150g of this" is something people can usually judge, while
+// "I ate 82% of this" generally isn't.
 function LoggedEntryRow({ entry, onRemove, onEdit }) {
   const [expanded, setExpanded] = useState(false)
   const hasBase = entry.baseCalories != null
-  const [portion, setPortion] = useState(entry.portion ?? 100)
+  const hasWeight = hasBase && Number(entry.servingWeightG) > 0
+  const baseGrams = hasWeight ? Number(entry.servingWeightG) : 0
 
-  function applyPortion(pct) {
-    setPortion(pct)
-    if (!hasBase) return
-    onEdit(entry.id, {
+  const [portion, setPortion] = useState(entry.portion ?? 100)
+  const initialWeight = hasWeight ? Math.round((baseGrams * (entry.portion ?? 100)) / 100) : 0
+  const [weightG, setWeightG] = useState(initialWeight)
+  const [weightDraft, setWeightDraft] = useState(hasWeight ? String(initialWeight) : '')
+
+  function patchForPortion(pct) {
+    return {
       portion: pct,
       calories: Math.round((entry.baseCalories * pct) / 100),
       protein: Math.round(((entry.baseProtein || 0) * pct) / 100 * 10) / 10,
       carbs: Math.round(((entry.baseCarbs || 0) * pct) / 100 * 10) / 10,
       fat: Math.round(((entry.baseFat || 0) * pct) / 100 * 10) / 10,
-    })
+    }
+  }
+
+  function applyPortion(pct) {
+    setPortion(pct)
+    if (hasWeight) {
+      const g = Math.round((baseGrams * pct) / 100)
+      setWeightG(g)
+      setWeightDraft(String(g))
+    }
+    if (!hasBase) return
+    onEdit(entry.id, patchForPortion(pct))
+  }
+
+  function applyWeight(g) {
+    if (!hasWeight || baseGrams <= 0) return
+    const grams = Math.max(0, Math.round(g))
+    const pct = Math.round((grams / baseGrams) * 100)
+    setWeightG(grams)
+    setPortion(pct)
+    onEdit(entry.id, patchForPortion(pct))
+  }
+
+  // Mirrors the backspace-safe pattern used elsewhere for number inputs:
+  // the text box tracks its own raw string (so clearing it to type a new
+  // value doesn't get immediately overwritten), and only pushes a real
+  // update once the string parses to a number.
+  function handleWeightDraftChange(v) {
+    setWeightDraft(v)
+    if (v === '') return
+    const num = Number(v)
+    if (!Number.isNaN(num)) applyWeight(num)
   }
 
   return (
@@ -210,7 +250,52 @@ function LoggedEntryRow({ entry, onRemove, onEdit }) {
 
       {expanded && (
         <div style={{ padding: '0 0 14px' }}>
-          {hasBase ? (
+          {hasBase && hasWeight && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <label style={{ marginBottom: 0 }}>Amount actually eaten</label>
+                <span className="mono small">{weightG}g <span className="muted">· {portion}%</span></span>
+              </div>
+              <input
+                type="range"
+                min={Math.max(1, Math.round(baseGrams * 0.1))}
+                max={Math.max(Math.round(baseGrams * 2), Math.round(baseGrams * 0.1) + 1)}
+                step={Math.max(1, Math.round(baseGrams * 0.02))}
+                value={weightG}
+                onChange={e => applyWeight(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
+                <input
+                  type="number"
+                  value={weightDraft}
+                  onChange={e => handleWeightDraftChange(e.target.value)}
+                  style={{ width: 90 }}
+                />
+                <span className="muted small">grams (logged as {baseGrams}g)</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                {[50, 75, 100, 125, 150].map(p => {
+                  const g = Math.round((baseGrams * p) / 100)
+                  return (
+                    <button
+                      key={p}
+                      className="secondary"
+                      style={{
+                        flex: 1, fontSize: 12, padding: '6px 4px',
+                        background: portion === p ? 'var(--fuel)' : 'var(--surface-2)',
+                        color: portion === p ? 'var(--on-fuel)' : 'var(--text)',
+                      }}
+                      onClick={() => applyPortion(p)}
+                    >
+                      {g}g
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+          {hasBase && !hasWeight && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ marginBottom: 0 }}>Portion actually eaten</label>
@@ -238,8 +323,12 @@ function LoggedEntryRow({ entry, onRemove, onEdit }) {
                   </button>
                 ))}
               </div>
+              <p className="muted small" style={{ marginTop: 8, marginBottom: 0 }}>
+                No weight was recorded for this item, so this adjusts by percentage of the logged amount instead.
+              </p>
             </>
-          ) : (
+          )}
+          {!hasBase && (
             <p className="muted small">
               This item was logged before portion adjusting existed, so there's no original amount to scale against — remove and re-log it to unlock this.
             </p>

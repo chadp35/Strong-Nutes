@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { AI_PROVIDERS } from '../lib/aiConfig.js'
 
-// Shared "pick a provider, get a key, paste it in" card — used both the
-// first time someone opens the AI scanner (inline, mid-task) and from
-// Settings when they want to view/change/remove it later. Never sends the
-// key anywhere itself; that's entirely up to the caller's onSave.
+// Shared "pick a provider, get a key, paste it in" card for any AI-powered
+// feature that needs a bring-your-own-key setup — never sends the key
+// anywhere itself; that's entirely up to the caller's onSave. Currently not
+// wired into any active feature (see AIScannerCard in SettingsTab.jsx for
+// why), but kept ready to reuse.
 export default function AIProviderSetup({ onSave, onCancel, saveLabel = 'Save & continue' }) {
   const providerKeys = Object.keys(AI_PROVIDERS)
   const [provider, setProvider] = useState(providerKeys[0])
@@ -21,7 +22,7 @@ export default function AIProviderSetup({ onSave, onCancel, saveLabel = 'Save & 
   return (
     <div>
       <p className="small" style={{ marginBottom: 12 }}>
-        The food scanner uses AI to identify meals from a photo or description, so it needs your own API key from one of these providers. Your key goes straight from your device to theirs for each scan — we only store it if you turn on syncing below.
+        AI-powered features use your own API key from one of these providers rather than a shared one. Your key goes straight from your device to theirs — we only store it if you turn on syncing below.
       </p>
       <div className="field">
         <label>AI provider</label>

@@ -126,8 +126,17 @@ const LUNCH_TEMP_LABELS = {
   either: 'No strong preference',
 }
 
-// Shows the current AI-scanner provider/key (masked) with Change/Remove, or
-// the setup form itself if nothing's configured yet or "Change" was tapped.
+// Shows the current AI-provider key (masked) with Change/Remove, or the
+// setup form itself if nothing's configured yet or "Change" was tapped.
+//
+// Not currently rendered anywhere — the AI food scanner this originally
+// powered got pulled (Gemini's free tier doesn't do image analysis, and it
+// was the only no-cost option), but the bring-your-own-key plumbing
+// (aiConfig.js, this component, AIProviderSetup, the analyze-food edge
+// function) is intentionally left in place so a future AI-powered feature
+// can reuse it without rebuilding any of this. To bring it back, render
+// <AIScannerCard aiConfig={aiConfig} onSetAIConfig={onSetAIConfig}
+// onClearAIConfig={onClearAIConfig} /> somewhere in the JSX below.
 function AIScannerCard({ aiConfig, onSetAIConfig, onClearAIConfig }) {
   const [editing, setEditing] = useState(false)
   const configured = aiConfig?.provider && aiConfig?.apiKey
@@ -135,11 +144,11 @@ function AIScannerCard({ aiConfig, onSetAIConfig, onClearAIConfig }) {
   if (!configured || editing) {
     return (
       <div className="card">
-        <h2>AI food scanner</h2>
+        <h2>AI provider key</h2>
         <AIProviderSetup
           onSave={cfg => { onSetAIConfig(cfg); setEditing(false) }}
           onCancel={configured ? () => setEditing(false) : undefined}
-          saveLabel={configured ? 'Save' : 'Save & enable scanner'}
+          saveLabel={configured ? 'Save' : 'Save key'}
         />
       </div>
     )
@@ -150,7 +159,7 @@ function AIScannerCard({ aiConfig, onSetAIConfig, onClearAIConfig }) {
 
   return (
     <div className="card">
-      <h2>AI food scanner</h2>
+      <h2>AI provider key</h2>
       <p className="small" style={{ marginBottom: 4 }}>Provider: {AI_PROVIDERS[aiConfig.provider]?.label || aiConfig.provider}</p>
       <p className="small mono" style={{ marginBottom: 4 }}>Key: {masked}</p>
       <p className="small" style={{ marginBottom: 12 }}>
@@ -286,8 +295,6 @@ export default function SettingsTab({
           P{profile.targets.protein}g · C{profile.targets.carbs}g · F{profile.targets.fat}g
         </p>
       </div>
-
-      <AIScannerCard aiConfig={aiConfig} onSetAIConfig={onSetAIConfig} onClearAIConfig={onClearAIConfig} />
 
       <div className="card">
         <h2>Timed goal</h2>

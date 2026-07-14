@@ -2,13 +2,11 @@ import React, { useState } from 'react'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
 import { searchLocalProducts } from '../lib/localProductSearch.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
-import AIFoodScanner from './AIFoodScanner.jsx'
 
 const SUBTABS = [
   { key: 'search', label: 'Search' },
   { key: 'mine', label: 'My Foods' },
   { key: 'manual', label: 'Manual' },
-  { key: 'scan', label: '📷 AI Scan' },
 ]
 
 export const MEAL_SLOTS = [
@@ -28,7 +26,7 @@ export function guessMealSlot(now = new Date()) {
   return 'snack'
 }
 
-export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered, defaultMealSlot, aiConfig, onSetAIConfig }) {
+export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered, defaultMealSlot }) {
   const [subtab, setSubtab] = useState('search')
   const [mealSlot, setMealSlot] = useState(defaultMealSlot || guessMealSlot())
 
@@ -91,9 +89,6 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
       {subtab === 'manual' && (
         <ManualEntry onAddEntry={taggedAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
       )}
-      {subtab === 'scan' && (
-        <AIFoodScanner aiConfig={aiConfig} onSetAIConfig={onSetAIConfig} onAddEntry={taggedAddEntry} onDone={onDone} />
-      )}
     </div>
   )
 }
@@ -152,11 +147,12 @@ function BrandedSearch({ onAddEntry, onSaveCustomFood, onDone, discoveredProduct
       id: Date.now().toString(),
       name: selected.brand ? `${selected.name} (${selected.brand})` : selected.name,
       ...macros,
+      servingWeightG: gramsNum,
     }
     onAddEntry(entry)
     onRecordDiscovered?.(selected)
     if (alsoSave) {
-      onSaveCustomFood({ id: `custom-${Date.now()}`, name: entry.name, ...macros, servingLabel: `${gramsNum}g` })
+      onSaveCustomFood({ id: `custom-${Date.now()}`, name: entry.name, ...macros, servingWeightG: gramsNum, servingLabel: `${gramsNum}g` })
     }
     setSelected(null)
     setQuery('')
@@ -265,7 +261,7 @@ function MyFoods({ customFoods, customRecipes, onAddEntry, onDeleteCustomFood, o
           {customRecipes.map(recipe => (
             <div
               className="meal-row" key={recipe.id} style={{ cursor: 'pointer' }}
-              onClick={() => { onAddEntry({ id: Date.now().toString(), name: recipe.name, calories: recipe.calories, protein: recipe.protein, carbs: recipe.carbs, fat: recipe.fat }); onDone?.() }}
+              onClick={() => { onAddEntry({ id: Date.now().toString(), name: recipe.name, calories: recipe.calories, protein: recipe.protein, carbs: recipe.carbs, fat: recipe.fat, servingWeightG: recipe.servingWeightG }); onDone?.() }}
             >
               <div>
                 <div className="meal-name">{recipe.name}</div>

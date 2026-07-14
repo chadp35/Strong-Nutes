@@ -291,6 +291,7 @@ export default function App() {
       protein: meal.protein,
       carbs: meal.carbs,
       fat: meal.fat,
+      servingWeightG: meal.servingWeightG,
     })
   }
 
