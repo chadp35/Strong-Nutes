@@ -16,6 +16,7 @@ create table if not exists app_state (
   contact_email text,
   custom_recipes jsonb not null default '[]'::jsonb,
   discovered_products jsonb not null default '[]'::jsonb,
+  ai_config jsonb,
   updated_at timestamptz not null default now()
 );
 
@@ -27,6 +28,11 @@ alter table app_state add column if not exists water jsonb not null default '{}'
 alter table app_state add column if not exists contact_email text;
 alter table app_state add column if not exists custom_recipes jsonb not null default '[]'::jsonb;
 alter table app_state add column if not exists discovered_products jsonb not null default '[]'::jsonb;
+-- Nullable on purpose — only ever written when someone explicitly opts in to
+-- syncing their AI food-scanner provider/API key across devices (see the
+-- AI Food Scanner section of AGENTS notes / aiConfig.js). Same RLS as every
+-- other column on this row: only the owning user can read or write it.
+alter table app_state add column if not exists ai_config jsonb;
 
 alter table app_state enable row level security;
 

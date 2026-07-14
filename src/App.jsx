@@ -16,6 +16,7 @@ import { calculateTargets } from './lib/calculations.js'
 import { amICoach } from './lib/coaching.js'
 import { useOnlineStatus } from './lib/useOnlineStatus.js'
 import { useTodayKey } from './lib/useTodayKey.js'
+import { resolveAIConfig, setLocalAIConfig } from './lib/aiConfig.js'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -27,6 +28,10 @@ export default function App() {
   const [isCoach, setIsCoach] = useState(false)
   const [dataSource, setDataSource] = useState('server') // 'server' | 'pending' | 'cache' | 'default'
   const [synced, setSynced] = useState(true)
+  // The AI scanner's active provider/key for THIS device — resolved once on
+  // load from either the synced copy (if the person opted into that) or
+  // whatever's already stored locally. See lib/aiConfig.js.
+  const [aiConfig, setAiConfig] = useState(null)
   const isOnline = useOnlineStatus()
   const saveTimer = useRef(null)
   // Reactive "today" — re-renders the Today tab automatically at midnight
@@ -59,6 +64,7 @@ export default function App() {
       setDataSource(source)
       setSynced(source === 'server')
       setStateLoading(false)
+      setAiConfig(resolveAIConfig(loaded.aiConfig))
     })
     amICoach(session.user.id).then(coach => setIsCoach(!!coach))
   }, [session?.user?.id])
@@ -294,6 +300,22 @@ export default function App() {
     }
   }
 
+  // Saves the AI scanner's provider/key. Always written to this device's
+  // localStorage; only mirrored into the synced app_state row (and so onto
+  // other devices) if the person explicitly checked "sync across devices."
+  function handleSetAIConfig({ provider, apiKey, sync }) {
+    const config = { provider, apiKey, synced: !!sync }
+    setLocalAIConfig(config)
+    setAiConfig(config)
+    setState(s => ({ ...s, aiConfig: sync ? config : null }))
+  }
+
+  function handleClearAIConfig() {
+    setLocalAIConfig(null)
+    setAiConfig(null)
+    setState(s => ({ ...s, aiConfig: null }))
+  }
+
   async function handleSignOut() {
     const { error } = await supabase.auth.signOut()
     if (error) alert("Couldn't sign out — check your connection and try again.")
@@ -459,6 +481,8 @@ export default function App() {
           customRecipes={state.customRecipes}
           discoveredProducts={state.discoveredProducts}
           onRecordDiscovered={handleRecordDiscoveredProduct}
+          aiConfig={aiConfig}
+          onSetAIConfig={handleSetAIConfig}
         />
       )}
       {tab === 'plan' && (
@@ -530,6 +554,9 @@ export default function App() {
           customRecipes={state.customRecipes}
           onDeleteRecipe={handleDeleteRecipe}
           onEditRecipe={handleEditRecipe}
+          aiConfig={aiConfig}
+          onSetAIConfig={handleSetAIConfig}
+          onClearAIConfig={handleClearAIConfig}
         />
       )}
 

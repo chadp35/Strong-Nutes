@@ -5,7 +5,9 @@ import { listCoaches } from '../lib/coaching.js'
 import { submitFeedback } from '../lib/feedback.js'
 import { ALLERGEN_OPTIONS, DIETARY_FRAMEWORK_OPTIONS } from '../data/allergens.js'
 import { THEMES, getStoredTheme, setStoredTheme } from '../lib/theme.js'
+import { AI_PROVIDERS } from '../lib/aiConfig.js'
 import GoalPlanner from './GoalPlanner.jsx'
+import AIProviderSetup from './AIProviderSetup.jsx'
 
 const FEEDBACK_TYPES = [
   { key: 'bug', label: '🐞 Bug' },
@@ -124,11 +126,55 @@ const LUNCH_TEMP_LABELS = {
   either: 'No strong preference',
 }
 
+// Shows the current AI-scanner provider/key (masked) with Change/Remove, or
+// the setup form itself if nothing's configured yet or "Change" was tapped.
+function AIScannerCard({ aiConfig, onSetAIConfig, onClearAIConfig }) {
+  const [editing, setEditing] = useState(false)
+  const configured = aiConfig?.provider && aiConfig?.apiKey
+
+  if (!configured || editing) {
+    return (
+      <div className="card">
+        <h2>AI food scanner</h2>
+        <AIProviderSetup
+          onSave={cfg => { onSetAIConfig(cfg); setEditing(false) }}
+          onCancel={configured ? () => setEditing(false) : undefined}
+          saveLabel={configured ? 'Save' : 'Save & enable scanner'}
+        />
+      </div>
+    )
+  }
+
+  const key = aiConfig.apiKey
+  const masked = key.length > 8 ? `${key.slice(0, 4)}••••${key.slice(-4)}` : '••••'
+
+  return (
+    <div className="card">
+      <h2>AI food scanner</h2>
+      <p className="small" style={{ marginBottom: 4 }}>Provider: {AI_PROVIDERS[aiConfig.provider]?.label || aiConfig.provider}</p>
+      <p className="small mono" style={{ marginBottom: 4 }}>Key: {masked}</p>
+      <p className="small" style={{ marginBottom: 12 }}>
+        {aiConfig.synced ? 'Synced across your devices.' : 'Stored on this device only.'}
+      </p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="secondary" style={{ flex: 1 }} onClick={() => setEditing(true)}>Change</button>
+        <button
+          className="secondary" style={{ flex: 1, color: 'var(--danger)' }}
+          onClick={() => { if (confirm('Remove your saved AI key? You can add it again anytime from here.')) onClearAIConfig() }}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsTab({
   profile, userEmail, userId, onEdit, onReset, onSignOut,
   onStartGoalPlan, onStopGoalPlan, fullState,
   onSelectCoach, onUpdateSafetyProfile,
   customRecipes, onDeleteRecipe, onEditRecipe,
+  aiConfig, onSetAIConfig, onClearAIConfig,
 }) {
   const weightLbs = kgToLbs(profile.weightKg)
   const [coaches, setCoaches] = useState([])
@@ -240,6 +286,8 @@ export default function SettingsTab({
           P{profile.targets.protein}g · C{profile.targets.carbs}g · F{profile.targets.fat}g
         </p>
       </div>
+
+      <AIScannerCard aiConfig={aiConfig} onSetAIConfig={onSetAIConfig} onClearAIConfig={onClearAIConfig} />
 
       <div className="card">
         <h2>Timed goal</h2>

@@ -2,11 +2,13 @@ import React, { useState } from 'react'
 import { searchBrandedFoods, macrosForGrams, getProductByBarcode } from '../lib/openFoodFacts.js'
 import { searchLocalProducts } from '../lib/localProductSearch.js'
 import BarcodeScanner from './BarcodeScanner.jsx'
+import AIFoodScanner from './AIFoodScanner.jsx'
 
 const SUBTABS = [
   { key: 'search', label: 'Search' },
   { key: 'mine', label: 'My Foods' },
   { key: 'manual', label: 'Manual' },
+  { key: 'scan', label: '📷 AI Scan' },
 ]
 
 export const MEAL_SLOTS = [
@@ -26,7 +28,7 @@ export function guessMealSlot(now = new Date()) {
   return 'snack'
 }
 
-export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered, defaultMealSlot }) {
+export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, onSaveCustomFood, onDeleteCustomFood, onDone, discoveredProducts, onRecordDiscovered, defaultMealSlot, aiConfig, onSetAIConfig }) {
   const [subtab, setSubtab] = useState('search')
   const [mealSlot, setMealSlot] = useState(defaultMealSlot || guessMealSlot())
 
@@ -88,6 +90,9 @@ export default function AddFoodPanel({ customFoods, customRecipes, onAddEntry, o
       )}
       {subtab === 'manual' && (
         <ManualEntry onAddEntry={taggedAddEntry} onSaveCustomFood={onSaveCustomFood} onDone={onDone} />
+      )}
+      {subtab === 'scan' && (
+        <AIFoodScanner aiConfig={aiConfig} onSetAIConfig={onSetAIConfig} onAddEntry={taggedAddEntry} onDone={onDone} />
       )}
     </div>
   )

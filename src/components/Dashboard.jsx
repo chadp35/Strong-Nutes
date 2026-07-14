@@ -37,6 +37,7 @@ export default function Dashboard({
   customFoods, onSaveCustomFood, onDeleteCustomFood, customRecipes,
   discoveredProducts, onRecordDiscovered,
   todaysWater, onChangeWater,
+  aiConfig, onSetAIConfig,
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const WATER_TARGET_CUPS = 8
@@ -155,6 +156,8 @@ export default function Dashboard({
             onDeleteCustomFood={onDeleteCustomFood}
             onDone={() => setShowAdd(false)}
             defaultMealSlot={guessMealSlot(now)}
+            aiConfig={aiConfig}
+            onSetAIConfig={onSetAIConfig}
           />
         )}
 

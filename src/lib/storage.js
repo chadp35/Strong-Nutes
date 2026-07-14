@@ -13,6 +13,7 @@ export const defaultState = {
   water: {},                // { 'YYYY-MM-DD': cupsCount }
   customRecipes: [],         // [{ id, name, type, tags, calories, protein, carbs, fat, servingWeightG, ingredients, recipe, isCustomRecipe, builderState }]
   discoveredProducts: [],     // [{ id, name, brand, caloriesPer100g, proteinPer100g, carbsPer100g, fatPer100g, servingGrams, servingLabel }] — grows every time a barcode scan or web search result actually gets used
+  aiConfig: null,              // { provider, apiKey } — ONLY present here (and synced to Supabase) if the person explicitly opted into cross-device sync in the AI scanner setup; device-only by default (see lib/aiConfig.js)
 }
 
 function normalizeRow(data) {
@@ -27,6 +28,7 @@ function normalizeRow(data) {
     water: data.water ?? {},
     customRecipes: data.custom_recipes ?? [],
     discoveredProducts: data.discovered_products ?? [],
+    aiConfig: data.ai_config ?? null,
   }
 }
 
@@ -79,6 +81,7 @@ async function attemptSave(userId, state, userEmail) {
     water: state.water,
     custom_recipes: state.customRecipes,
     discovered_products: state.discoveredProducts,
+    ai_config: state.aiConfig ?? null,
     contact_email: userEmail,
   })
   if (error) throw error
